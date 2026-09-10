@@ -88,6 +88,34 @@ public partial class AddDeviceWindow : Window
         PasswordBox.Focus();
     }
 
+    /// <summary>
+    /// Opens the recovery assistant for whichever device is in focus - the selected scan result, or
+    /// the address typed in manually. A successful recovery connects and closes this dialog too.
+    /// </summary>
+    private void OnForgotPassword(object sender, System.Windows.RoutedEventArgs e)
+    {
+        var host = HostBox.Text.Trim();
+
+        var target = (DeviceList.SelectedItem as DiscoveredRow)?.Device
+            ?? (host.Length > 0
+                ? new DiscoveredDevice { Host = host, Source = DiscoverySource.Manual }
+                : null);
+
+        if (target is null)
+        {
+            ResultText.Text = "Pick a device from the list, or type its address first.";
+            return;
+        }
+
+        var reset = new PasswordResetWindow(_store, target) { Owner = this };
+
+        if (reset.ShowDialog() == true)
+        {
+            AddedDevice = reset.ConnectedDevice;
+            DialogResult = true;
+        }
+    }
+
     private async void OnConnect(object sender, RoutedEventArgs e)
     {
         var host = HostBox.Text.Trim();

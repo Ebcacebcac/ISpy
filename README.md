@@ -12,6 +12,10 @@ recorder is three metres away on the same switch.
 
 - **Finds your recorder** with SADP and ONVIF discovery, or by address if your router blocks
   multicast. Credentials are entered once and stored encrypted with Windows DPAPI.
+- **Lost the password?** A recovery assistant gathers the exact reset details from the device,
+  exports them for your reseller, walks you through the Guarding Vision account reset, and
+  connects the moment you've set a new one. It never fakes the reset itself — that ownership
+  check stays with your account or reseller, where the key actually lives.
 - **Live grid** of 1, 4, 9 or 16 cameras, hardware-decoded on the GPU. Tiles use the recorder's
   sub-stream; double-click one and it switches to the full-resolution main stream.
 - **Recorded playback** with a scrubbable day timeline, colour-coded by what triggered the

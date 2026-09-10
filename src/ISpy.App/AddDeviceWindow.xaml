@@ -46,6 +46,7 @@
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Address" VerticalAlignment="Center" Margin="0,0,8,6" />
@@ -57,6 +58,11 @@
       <TextBox x:Name="UserBox" Grid.Row="1" Grid.Column="1" Text="admin" Margin="0,0,8,0" Padding="4,3" />
       <TextBlock Grid.Row="1" Grid.Column="2" Text="Password" VerticalAlignment="Center" Margin="0,0,8,0" />
       <PasswordBox x:Name="PasswordBox" Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="3" Padding="4,3" />
+
+      <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="5" Margin="0,6,0,0">
+        <Hyperlink x:Name="ForgotLink" Click="OnForgotPassword"
+                   Foreground="{StaticResource Accent}">Forgot the password?</Hyperlink>
+      </TextBlock>
     </Grid>
 
     <DockPanel Grid.Row="3" Margin="0,14,0,0">
