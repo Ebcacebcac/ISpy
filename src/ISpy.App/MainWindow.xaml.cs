@@ -15,7 +15,9 @@ public partial class MainWindow : Window
 {
     private InventoryStore? _store;
     private LiveGrid? _grid;
+    private UpdateService? _updates;
     private IntPtr _canvasHandle;
+    private UpdateStatus? _pendingUpdate;
 
     public MainWindow()
     {
@@ -53,6 +55,7 @@ public partial class MainWindow : Window
 
         StartupTimeline.Mark("inventory loaded");
         ShowStartupTimings();
+        StartUpdateChecks();
     }
 
     private void RenderInventory()
@@ -151,6 +154,62 @@ public partial class MainWindow : Window
             _grid.ToggleMaximized(index);
     }
 
+    /// <summary>
+    /// Starts checking for updates in the background, once the window is up. Nothing here may
+    /// delay startup, so it is deliberately the last thing the load path does.
+    /// </summary>
+    private void StartUpdateChecks()
+    {
+        _updates = new UpdateService(_store);
+
+        _updates.StatusChanged += status => Dispatcher.BeginInvoke(() =>
+        {
+            if (!status.IsAvailable) return;
+
+            _pendingUpdate = status;
+            UpdateIndicator.Text = $"Update to {status.Version}";
+            UpdateIndicator.Visibility = Visibility.Visible;
+        });
+
+        _updates.Start();
+    }
+
+    /// <summary>
+    /// Offers the update. Non-modal until clicked, so a check finding something can never
+    /// interrupt someone watching their cameras.
+    /// </summary>
+    private async void OnUpdateClicked(object sender, MouseButtonEventArgs e)
+    {
+        if (_updates is null || _pendingUpdate is null) return;
+
+        var notes = string.IsNullOrWhiteSpace(_pendingUpdate.ReleaseNotes)
+            ? ""
+            : $"\n\n{_pendingUpdate.ReleaseNotes.Trim()}";
+
+        var answer = MessageBox.Show(
+            this,
+            $"ISpy {_pendingUpdate.Version} is available. Install it and restart now?{notes}",
+            "Update available",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Information);
+
+        if (answer != MessageBoxResult.OK) return;
+
+        UpdateIndicator.Text = "Downloading…";
+
+        var progress = new Progress<int>(percent =>
+            UpdateIndicator.Text = percent >= 100 ? "Installing…" : $"Downloading… {percent}%");
+
+        // Streams are stopped before the restart so nothing is half-written on the way out.
+        var error = await _updates.ApplyAsync(progress, () => Dispatcher.Invoke(() => _grid?.Dispose()));
+
+        if (error is not null)
+        {
+            UpdateIndicator.Text = "Update failed";
+            MessageBox.Show(this, error, "Update failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OnOpenPlayback(object sender, RoutedEventArgs e)
     {
         if (_store is null) return;
@@ -212,6 +271,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _updates?.Dispose();
         _grid?.Dispose();
         _store?.Dispose();
         base.OnClosed(e);

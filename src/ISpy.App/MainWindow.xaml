@@ -24,7 +24,9 @@
       <DockPanel>
         <TextBlock Text="ISpy" FontSize="15" FontWeight="SemiBold" />
         <TextBlock x:Name="UpdateIndicator" DockPanel.Dock="Right" Visibility="Collapsed"
-                   Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available" />
+                   VerticalAlignment="Center" Margin="12,0,0,0"
+                   Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available"
+                   MouseLeftButtonUp="OnUpdateClicked" />
         <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Add recorder" Padding="12,4"
                 Margin="8,0,0,0" Click="OnAddDevice" />
         <Button DockPanel.Dock="Right" Content="16" Padding="10,4" Margin="2,0,8,0"

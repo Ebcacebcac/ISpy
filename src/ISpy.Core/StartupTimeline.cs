@@ -1,9 +1,7 @@
-using System.IO;
 using System.Diagnostics;
 using System.Text;
-using ISpy.Core;
 
-namespace ISpy.App;
+namespace ISpy.Core;
 
 /// <summary>
 /// Records how long each stage of startup took, measured from process start rather than from
@@ -47,6 +45,41 @@ public static class StartupTimeline
         lock (Gate) return Marks.ToArray();
     }
 
+    /// <summary>Clears recorded marks. For tests.</summary>
+    public static void Reset()
+    {
+        lock (Gate) Marks.Clear();
+    }
+
+    /// <summary>
+    /// Stages that missed their budget, so a regression shows up in the log rather than only being
+    /// noticed as "it feels slower than it used to".
+    /// </summary>
+    public static IReadOnlyList<string> BudgetBreaches(
+        IReadOnlyList<(string Stage, TimeSpan At)> marks)
+    {
+        var breaches = new List<string>();
+
+        foreach (var (stage, at) in marks)
+        {
+            var budget = BudgetFor(stage);
+            if (budget is null || at <= budget) continue;
+
+            breaches.Add(
+                $"{stage} took {at.TotalMilliseconds:F0}ms, over its {budget.Value.TotalMilliseconds:F0}ms budget");
+        }
+
+        return breaches;
+    }
+
+    /// <summary>The budget a stage is held to, or null when it is only recorded for context.</summary>
+    public static TimeSpan? BudgetFor(string stage) => stage switch
+    {
+        "window shown" => WindowVisibleBudget,
+        "first frame" => FirstFrameBudget,
+        _ => null,
+    };
+
     /// <summary>Appends the run's timings to the log directory. Best effort - never throws.</summary>
     public static void Flush()
     {
@@ -55,9 +88,14 @@ public static class StartupTimeline
             var report = new StringBuilder()
                 .Append("startup ").Append(DateTimeOffset.UtcNow.ToString("O")).AppendLine();
 
-            foreach (var (stage, at) in Snapshot())
+            var marks = Snapshot();
+
+            foreach (var (stage, at) in marks)
                 report.Append("  ").Append(at.TotalMilliseconds.ToString("F1"))
                       .Append("ms  ").AppendLine(stage);
+
+            foreach (var breach in BudgetBreaches(marks))
+                report.Append("  OVER BUDGET: ").AppendLine(breach);
 
             AppPaths.EnsureCreated();
             File.AppendAllText(Path.Combine(AppPaths.LogDirectory, "startup.log"), report.ToString());

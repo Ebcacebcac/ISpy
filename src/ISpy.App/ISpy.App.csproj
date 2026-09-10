@@ -15,4 +15,7 @@
     <ProjectReference Include="../ISpy.Core/ISpy.Core.csproj" />
     <ProjectReference Include="..\ISpy.Media\ISpy.Media.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.0" />
+  </ItemGroup>
 </Project>

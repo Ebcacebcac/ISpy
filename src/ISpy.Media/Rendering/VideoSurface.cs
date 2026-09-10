@@ -1,4 +1,5 @@
 using FFmpeg.AutoGen;
+using ISpy.Core.Media;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
 using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
@@ -41,6 +42,72 @@ public sealed unsafe class VideoSurface : IDisposable
 
     public ID3D11ShaderResourceView? Luma => _luma;
     public ID3D11ShaderResourceView? Chroma => _chroma;
+
+    /// <summary>
+    /// Uploads a still image as the tile's contents, used to show the last known frame while the
+    /// live stream is still connecting. Overwritten by the first real frame.
+    /// </summary>
+    public void SetPoster(ReadOnlySpan<byte> bgra, int width, int height)
+    {
+        if (width < 2 || height < 2) return;
+
+        EnsureTextures(width, height);
+        if (_texture is null || _staging is null) return;
+
+        var mapped = _gpu.Context.Map(_staging, 0, Vortice.Direct3D11.MapMode.Write, MapFlags.None);
+
+        try
+        {
+            var destination = new Span<byte>(
+                (void*)mapped.DataPointer, (int)mapped.RowPitch * height * 3 / 2);
+
+            ColorConversion.BgraToNv12(bgra, destination, width, height, (int)mapped.RowPitch);
+        }
+        finally
+        {
+            _gpu.Context.Unmap(_staging, 0);
+        }
+
+        _gpu.Context.CopyResource(_texture, _staging);
+        HasContent = true;
+    }
+
+    /// <summary>
+    /// Reads the current picture back as BGRA so it can be saved as a thumbnail. A GPU readback
+    /// stalls the pipeline, so this is only ever called on shutdown.
+    /// </summary>
+    public byte[]? ReadBack()
+    {
+        if (_texture is null || Width < 2 || Height < 2) return null;
+
+        using var readable = _gpu.Device.CreateTexture2D(new Texture2DDescription
+        {
+            Width = (uint)Width,
+            Height = (uint)Height,
+            MipLevels = 1,
+            ArraySize = 1,
+            Format = Format.NV12,
+            SampleDescription = new SampleDescription(1, 0),
+            Usage = ResourceUsage.Staging,
+            CPUAccessFlags = CpuAccessFlags.Read,
+        });
+
+        _gpu.Context.CopyResource(readable, _texture);
+
+        var mapped = _gpu.Context.Map(readable, 0, Vortice.Direct3D11.MapMode.Read, MapFlags.None);
+
+        try
+        {
+            var source = new ReadOnlySpan<byte>(
+                (void*)mapped.DataPointer, (int)mapped.RowPitch * Height * 3 / 2);
+
+            return ColorConversion.Nv12ToBgra(source, Width, Height, (int)mapped.RowPitch);
+        }
+        finally
+        {
+            _gpu.Context.Unmap(readable, 0);
+        }
+    }
 
     /// <summary>Copies a decoded frame in. Called on the decode thread while the frame is valid.</summary>
     public void Update(AVFrame* frame, VideoFrameInfo info)

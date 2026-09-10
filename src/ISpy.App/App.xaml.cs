@@ -1,4 +1,6 @@
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
 using ISpy.Core;
@@ -7,9 +9,27 @@ namespace ISpy.App;
 
 public partial class App : Application
 {
+    /// <summary>Held for the process lifetime; releasing it is what lets the next launch start.</summary>
+    private Mutex? _singleInstance;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         StartupTimeline.Mark("managed entry");
+
+        // Must run before any window exists. On an install, update or uninstall the launcher passes
+        // hook arguments and this call services them and exits; on a normal launch it costs
+        // microseconds and returns.
+        Velopack.VelopackApp.Build().Run();
+
+        if (!ClaimSingleInstance())
+        {
+            // A second launch should raise the window that is already open rather than opening a
+            // second grid and doubling the load on the recorder.
+            ActivateRunningInstance();
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
@@ -29,8 +49,48 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         StartupTimeline.Flush();
+
+        _singleInstance?.ReleaseMutex();
+        _singleInstance?.Dispose();
+
         base.OnExit(e);
     }
+
+    private bool ClaimSingleInstance()
+    {
+        // Local, not Global: two Windows users on one machine may each run their own copy.
+        _singleInstance = new Mutex(initiallyOwned: true, @"Local\ISpy.SingleInstance", out var isOwner);
+
+        if (isOwner) return true;
+
+        _singleInstance.Dispose();
+        _singleInstance = null;
+        return false;
+    }
+
+    private static void ActivateRunningInstance()
+    {
+        var current = System.Diagnostics.Process.GetCurrentProcess();
+
+        foreach (var process in System.Diagnostics.Process.GetProcessesByName(current.ProcessName))
+        {
+            if (process.Id == current.Id || process.MainWindowHandle == IntPtr.Zero) continue;
+
+            ShowWindow(process.MainWindowHandle, ShowWindowRestore);
+            SetForegroundWindow(process.MainWindowHandle);
+            return;
+        }
+    }
+
+    private const int ShowWindowRestore = 9;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hwnd);
 
     /// <summary>
     /// Leaves a crash trail rather than vanishing. The likeliest cause of an unexpected exception

@@ -1,4 +1,5 @@
 using System.Windows.Media;
+using ISpy.Core;
 using ISpy.Core.Media;
 using ISpy.Core.Model;
 using ISpy.Core.Protocol;
@@ -58,6 +59,20 @@ public sealed class LiveGrid : IDisposable
     /// <summary>Raised when a stream's state changes, so the status bar can be refreshed.</summary>
     public event Action? StateChanged;
 
+    private bool _firstFrameMarked;
+
+    private void OnStreamStateChanged(CameraStream stream)
+    {
+        // The first camera to deliver a picture is what the first-frame budget is measured against.
+        if (!_firstFrameMarked && stream.State == StreamState.Playing)
+        {
+            _firstFrameMarked = true;
+            StartupTimeline.Mark("first frame");
+        }
+
+        StateChanged?.Invoke();
+    }
+
     /// <summary>Attaches to the canvas window. Called once the HWND exists.</summary>
     public void Attach(IntPtr windowHandle, int width, int height)
     {
@@ -101,9 +116,15 @@ public sealed class LiveGrid : IDisposable
                 var stream = new CameraStream(
                     BuildOptions(device, channel, profile, password), _gpu, _hardware);
 
-                stream.StateChanged += _ => StateChanged?.Invoke();
+                stream.StateChanged += OnStreamStateChanged;
 
                 _entries.Add(new GridEntry(device, channel, stream) { Profile = profile });
+
+                // Paint the last known frame before the connection is even attempted, so the grid
+                // is never a wall of black rectangles while RTSP negotiates.
+                if (PosterStore.Load(device.Id, channel.Number) is { } poster)
+                    stream.Surface.SetPoster(poster.Bgra, poster.Width, poster.Height);
+
                 stream.Start();
             }
         }
@@ -230,6 +251,31 @@ public sealed class LiveGrid : IDisposable
         return $"{playing}/{_entries.Count} live · {hardware}";
     }
 
+    /// <summary>
+    /// Saves each tile's current frame for the next launch. A readback stalls the GPU, which is why
+    /// it happens here on the way out rather than periodically.
+    /// </summary>
+    public void SavePosters()
+    {
+        foreach (var entry in _entries)
+        {
+            if (entry.Stream.FrameCount == 0) continue;
+
+            try
+            {
+                if (entry.Stream.Surface.ReadBack() is not { } pixels) continue;
+
+                PosterStore.Save(
+                    entry.Device.Id, entry.Channel.Number, pixels,
+                    entry.Stream.Surface.Width, entry.Stream.Surface.Height);
+            }
+            catch (Exception)
+            {
+                // Never let a thumbnail stop the app closing.
+            }
+        }
+    }
+
     private void StopStreams()
     {
         foreach (var entry in _entries) entry.Stream.Dispose();
@@ -244,6 +290,7 @@ public sealed class LiveGrid : IDisposable
             _rendering = false;
         }
 
+        SavePosters();
         StopStreams();
         _presenter?.Dispose();
         _hardware?.Dispose();
