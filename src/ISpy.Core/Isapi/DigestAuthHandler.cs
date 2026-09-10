@@ -46,7 +46,16 @@ public sealed class DigestAuthHandler : DelegatingHandler
 
         // Either we had no challenge yet, or the cached one went stale. Take the new one and retry.
         var challenge = ReadChallenge(response);
-        if (challenge is null) return response;
+        if (challenge is null)
+        {
+            Core.Logs.Append("isapi.log",
+                "401 with no Digest challenge - device may be set to Basic-only auth.");
+            return response;
+        }
+
+        Core.Logs.Append("isapi.log",
+            $"digest challenge: realm=\"{challenge.Realm}\" qop={challenge.Qop ?? "(none)"} " +
+            $"algorithm={challenge.Algorithm} nonceLen={challenge.Nonce.Length}");
 
         lock (_gate)
         {
@@ -59,7 +68,18 @@ public sealed class DigestAuthHandler : DelegatingHandler
         var retry = await CloneAsync(request).ConfigureAwait(false);
         ApplyCachedAuthorization(retry);
 
-        return await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
+        var authed = await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
+
+        if (authed.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            // We answered the challenge and the device still said no. That narrows it to a genuinely
+            // wrong password or a firmware quirk in the response format - never a missing handshake.
+            Core.Logs.Append("isapi.log",
+                $"digest response rejected for user '{_username}' - the password is wrong, or this " +
+                "firmware wants a different digest form.");
+        }
+
+        return authed;
     }
 
     private void ApplyCachedAuthorization(HttpRequestMessage request)
