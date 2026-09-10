@@ -99,8 +99,25 @@ public sealed class IsapiClient : IDisposable
                         Snippet(body));
                 }
 
-                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
                     throw new IsapiAuthenticationException(DescribeAuthFailure(body));
+
+                // Old firmware answers 403 for two very different things: a credential problem
+                // (lockout, no permission) and an endpoint it simply does not implement, which it
+                // marks notSupport/invalidOperation. Only the former is an authentication failure -
+                // reading the latter as "wrong password" sent a real user chasing password resets
+                // while the device was answering other endpoints perfectly.
+                if (response.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    if (LooksAuthRelated(body))
+                        throw new IsapiAuthenticationException(DescribeAuthFailure(body));
+
+                    var sub = Protocol.Xml.TryParse(body)?.Value("subStatusCode");
+                    throw new IsapiException(
+                        $"{request.RequestUri?.AbsolutePath} is not supported by this device" +
+                        (sub is null ? "." : $" ({sub})."),
+                        response.StatusCode);
+                }
 
                 if (!response.IsSuccessStatusCode)
                     throw new IsapiException(
@@ -113,9 +130,11 @@ public sealed class IsapiClient : IDisposable
     }
 
     /// <summary>
-    /// Requests an endpoint that may legitimately be absent. Returns null on 4xx rather than
-    /// throwing, because whether a device exposes InputProxy or PTZ is exactly what we are probing
-    /// for and a 404 is a valid answer.
+    /// Requests an endpoint that may legitimately be absent. An error status (404, 403 notSupport,
+    /// 503) becomes null, because whether a device implements an endpoint is exactly what we are
+    /// probing for. A transport failure - unreachable, timed out - still throws: it says nothing
+    /// about the endpoint and everything about the device, and swallowing it would make a powered-
+    /// off recorder read as "reports no cameras".
     /// </summary>
     public async Task<string?> TryGetAsync(string path, CancellationToken cancellationToken = default)
     {
@@ -123,7 +142,7 @@ public sealed class IsapiClient : IDisposable
         {
             return await GetAsync(path, cancellationToken).ConfigureAwait(false);
         }
-        catch (IsapiException)
+        catch (IsapiException ex) when (ex.Status is not null)
         {
             return null;
         }
@@ -150,6 +169,16 @@ public sealed class IsapiClient : IDisposable
             return "The device has not been activated yet. Activate it in Guarding Vision first.";
 
         return "The device rejected the username or password.";
+    }
+
+    /// <summary>True when a 403's body points at the user rather than the endpoint.</summary>
+    public static bool LooksAuthRelated(string body)
+    {
+        var lowered = body.ToLowerInvariant();
+
+        return lowered.Contains("lock") || lowered.Contains("password") ||
+               lowered.Contains("permission") || lowered.Contains("privilege") ||
+               lowered.Contains("usercheck") || lowered.Contains("notactivate");
     }
 
     /// <summary>A single-line, length-capped slice of a response body, for the log.</summary>

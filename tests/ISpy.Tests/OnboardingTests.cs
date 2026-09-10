@@ -112,6 +112,8 @@ public class OnboardingTests : IDisposable
     {
         using var nvr = new FakeNvr().WithTypicalRecorder();
         nvr.Serve("/ISAPI/Streaming/channels", "<StreamingChannelList/>");
+        // The fallback source must be empty too, or the fallback (correctly) finds cameras.
+        nvr.Serve("/ISAPI/ContentMgmt/InputProxy/channels", "<InputProxyChannelList/>");
         using var store = NewStore();
 
         var result = await new DeviceOnboarding(store).AddAsync(Target(nvr), "admin", "pw");

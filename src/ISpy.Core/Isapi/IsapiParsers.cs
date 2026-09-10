@@ -116,6 +116,30 @@ public static class IsapiParsers
     }
 
     /// <summary>
+    /// Builds the channel list from the NVR's InputProxy names alone - the fallback for firmware
+    /// old enough that /ISAPI/Streaming/channels answers notSupport (2016-2017 NVRs do exactly
+    /// this while still serving the InputProxy list happily).
+    /// </summary>
+    public static IReadOnlyList<Channel> FromInputProxyNames(
+        string deviceId, IReadOnlyDictionary<int, string> names) =>
+        names
+            .OrderBy(entry => entry.Key)
+            .Select(entry => new Channel
+            {
+                DeviceId = deviceId,
+                Number = entry.Key,
+                Name = entry.Value,
+
+                // These NVRs publish a sub stream for every proxied camera at <channel>02, and sub
+                // streams are H.264 in practice. The decoder detects the real codec from the
+                // bitstream regardless; recording it here keeps tile selection on the cheap stream
+                // instead of treating "codec unknown" as "sub stream missing" and pulling
+                // full-resolution main streams for every tile.
+                SubCodec = "H.264",
+            })
+            .ToArray();
+
+    /// <summary>
     /// Merges supplementary names and PTZ capability into a channel list.
     /// </summary>
     public static IReadOnlyList<Channel> Enrich(
