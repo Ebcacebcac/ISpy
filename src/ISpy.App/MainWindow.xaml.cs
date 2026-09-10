@@ -151,6 +151,13 @@ public partial class MainWindow : Window
             _grid.ToggleMaximized(index);
     }
 
+    private void OnOpenPlayback(object sender, RoutedEventArgs e)
+    {
+        if (_store is null) return;
+
+        new PlaybackWindow(_store) { Owner = this }.Show();
+    }
+
     private void OnAddDevice(object sender, RoutedEventArgs e)
     {
         if (_store is null) return;

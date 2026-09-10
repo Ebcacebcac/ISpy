@@ -37,6 +37,8 @@
                 Tag="1" Click="OnSetLayout" />
         <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh" Padding="12,4"
                 Click="OnRefresh" />
+        <Button x:Name="PlaybackButton" DockPanel.Dock="Right" Content="Playback" Padding="12,4"
+                Margin="0,0,8,0" Click="OnOpenPlayback" />
         <TextBlock x:Name="StatusText" Margin="16,0,0,0" VerticalAlignment="Center"
                    Foreground="{StaticResource TextMuted}" Text="Starting…" />
       </DockPanel>

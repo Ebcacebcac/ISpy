@@ -43,6 +43,12 @@ public sealed unsafe class CameraStream : IVideoTarget, IDisposable
 
     public DateTimeOffset? LastFrameUtc { get; private set; }
 
+    /// <summary>
+    /// Presentation timestamp of the newest frame, measured from the start of the stream. For
+    /// playback this is how far into the requested span we are, which is what drives the playhead.
+    /// </summary>
+    public TimeSpan StreamPosition { get; private set; }
+
     /// <summary>Raised whenever <see cref="State"/> changes. Fired from the decode thread.</summary>
     public event Action<CameraStream>? StateChanged;
 
@@ -76,6 +82,7 @@ public sealed unsafe class CameraStream : IVideoTarget, IDisposable
         Stop();
         _options = options;
         _reconnect.Reset();
+        StreamPosition = TimeSpan.Zero;
         Start();
     }
 
@@ -138,6 +145,7 @@ public sealed unsafe class CameraStream : IVideoTarget, IDisposable
     {
         Surface.Update(frame, info);
 
+        StreamPosition = info.Timestamp;
         FrameCount++;
         LastFrameUtc = DateTimeOffset.UtcNow;
 
