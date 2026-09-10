@@ -87,10 +87,19 @@ public sealed class IsapiClient : IDisposable
 
             using (response)
             {
-                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-                    throw new IsapiAuthenticationException("The device rejected these credentials.");
-
                 var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    // The device's own reply is the fastest route to the real cause, so record the
+                    // status and a slice of the body verbatim before turning it into a message.
+                    Core.Logs.Append("isapi.log",
+                        $"{(int)response.StatusCode} {request.Method} {request.RequestUri?.AbsolutePath} :: " +
+                        Snippet(body));
+                }
+
+                if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                    throw new IsapiAuthenticationException(DescribeAuthFailure(body));
 
                 if (!response.IsSuccessStatusCode)
                     throw new IsapiException(
@@ -117,6 +126,36 @@ public sealed class IsapiClient : IDisposable
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Turns a 401/403 body into a message that names the real cause. The one that matters most is
+    /// the login lockout: after a handful of failed attempts, Hikvision firmware locks the client's
+    /// IP for a while and rejects even the correct password - so "wrong password" would be a lie,
+    /// and the fix (wait, or reboot the recorder) is completely different.
+    /// </summary>
+    public static string DescribeAuthFailure(string body)
+    {
+        var lowered = body.ToLowerInvariant();
+
+        if (lowered.Contains("lock"))
+        {
+            return "The recorder has temporarily locked out this PC after repeated sign-in " +
+                   "attempts. Reboot the recorder to clear it immediately (or wait ~30 minutes), " +
+                   "then try once with the correct password.";
+        }
+
+        if (lowered.Contains("notactivate"))
+            return "The device has not been activated yet. Activate it in Guarding Vision first.";
+
+        return "The device rejected the username or password.";
+    }
+
+    /// <summary>A single-line, length-capped slice of a response body, for the log.</summary>
+    private static string Snippet(string body)
+    {
+        var oneLine = string.Join(' ', body.Split('\n', '\r').Select(l => l.Trim()).Where(l => l.Length > 0));
+        return oneLine.Length > 300 ? oneLine[..300] : oneLine;
     }
 
     private string Url(string path) => $"{_baseUrl}/{path.TrimStart('/')}";

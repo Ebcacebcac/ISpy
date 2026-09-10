@@ -203,3 +203,32 @@ public class IsapiParserTests
         Assert.Null(info.SerialNumber);
     }
 }
+
+
+public class AuthFailureMessageTests
+{
+    [Theory]
+    [InlineData("<ResponseStatus><subStatusCode>userLock</subStatusCode></ResponseStatus>")]
+    [InlineData("<ResponseStatus><statusString>User is locked</statusString></ResponseStatus>")]
+    [InlineData("<html>Account lockout in effect</html>")]
+    public void A_lockout_body_produces_lockout_guidance(string body)
+    {
+        var message = IsapiClient.DescribeAuthFailure(body);
+        Assert.Contains("locked out", message, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_not_activated_body_says_so()
+    {
+        var message = IsapiClient.DescribeAuthFailure(
+            "<ResponseStatus><subStatusCode>notActivated</subStatusCode></ResponseStatus>");
+        Assert.Contains("activated", message, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void An_ordinary_rejection_reads_as_a_bad_password()
+    {
+        var message = IsapiClient.DescribeAuthFailure("<ResponseStatus><statusCode>4</statusCode></ResponseStatus>");
+        Assert.Contains("username or password", message, System.StringComparison.OrdinalIgnoreCase);
+    }
+}

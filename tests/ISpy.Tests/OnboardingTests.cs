@@ -74,6 +74,23 @@ public class OnboardingTests : IDisposable
     }
 
     [Fact]
+    public async Task A_lockout_is_reported_distinctly_from_a_wrong_password()
+    {
+        using var nvr = new FakeNvr().WithTypicalRecorder();
+        // Hikvision returns the lock as a 403 with a subStatusCode naming it.
+        nvr.Serve("/ISAPI/Streaming/channels",
+            "<ResponseStatus><statusCode>4</statusCode><subStatusCode>userLock</subStatusCode></ResponseStatus>",
+            System.Net.HttpStatusCode.Forbidden);
+        using var store = NewStore();
+
+        var result = await new DeviceOnboarding(store).AddAsync(Target(nvr), "admin", "correct-pw");
+
+        Assert.Equal(OnboardStatus.BadCredentials, result.Status);
+        Assert.Contains("locked out", result.Message, System.StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reboot", result.Message, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task A_device_with_no_channels_is_not_saved()
     {
         using var nvr = new FakeNvr().WithTypicalRecorder();

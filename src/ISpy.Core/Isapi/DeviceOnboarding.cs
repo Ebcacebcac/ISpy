@@ -45,10 +45,11 @@ public sealed class DeviceOnboarding(InventoryStore store, DeviceInspector? insp
             inspection = await _inspector.InspectAsync(client, discovered.Id, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (IsapiAuthenticationException)
+        catch (IsapiAuthenticationException ex)
         {
-            return new OnboardResult(OnboardStatus.BadCredentials,
-                Message: "That username or password was rejected by the device.");
+            // Surface the device's actual reason - a lockout reads very differently from a wrong
+            // password, and the remedy is different too.
+            return new OnboardResult(OnboardStatus.BadCredentials, Message: ex.Message);
         }
         catch (IsapiException ex)
         {
