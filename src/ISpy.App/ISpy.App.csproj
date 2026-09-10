@@ -6,11 +6,16 @@
     <RootNamespace>ISpy.App</RootNamespace>
     <AssemblyName>ISpy</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/ISpy.ico</ApplicationIcon>
     <!-- Startup budget: no satellite assembly probing, no unnecessary JIT on the paint path. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <TieredPGO>true</TieredPGO>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets/ISpy.ico" />
+    <Resource Include="Assets/ISpy-header.png" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../ISpy.Core/ISpy.Core.csproj" />
     <ProjectReference Include="..\ISpy.Media\ISpy.Media.csproj" />

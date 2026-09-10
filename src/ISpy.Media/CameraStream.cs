@@ -61,7 +61,7 @@ public sealed unsafe class CameraStream : IVideoTarget, IDisposable
             _cancellation = new CancellationTokenSource();
             var token = _cancellation.Token;
 
-            _worker = new Thread(() => RunUntilStopped(token))
+            _worker = new Thread(() => GuardedRun(token))
             {
                 IsBackground = true,
                 Name = $"ISpy stream {_options.SafeUrl}",
@@ -107,6 +107,32 @@ public sealed unsafe class CameraStream : IVideoTarget, IDisposable
         }
 
         SetState(StreamState.Idle, null);
+    }
+
+    /// <summary>
+    /// The thread's outermost frame. An exception escaping a background thread ends the whole
+    /// process, so whatever slips past the loop's own handling - including a throwing
+    /// StateChanged subscriber - is caught here and turned into a failed tile instead.
+    /// </summary>
+    private void GuardedRun(CancellationToken cancellationToken)
+    {
+        try
+        {
+            RunUntilStopped(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Core.Logs.Append("crash.log", $"stream thread for {_options.SafeUrl}: {ex}");
+
+            try
+            {
+                SetState(StreamState.Failed, ex.Message);
+            }
+            catch (Exception)
+            {
+                // The subscriber failing again is the one case with nothing left to report to.
+            }
+        }
     }
 
     private void RunUntilStopped(CancellationToken cancellationToken)

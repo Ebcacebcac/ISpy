@@ -57,8 +57,11 @@ jobs:
       - name: Bundle FFmpeg
         shell: pwsh
         run: |
-          # The LGPL shared build: decode only, no GPL-only components, matching how ISpy uses it.
-          $url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl-shared.zip'
+          # The n9.0 RELEASE build, LGPL shared, pinned to match FFmpeg.AutoGen 9.0.x. Never the
+          # master snapshot: it changes daily, and the struct offsets the bindings bake in are only
+          # guaranteed against the release the bindings were generated from - a mismatch is memory
+          # corruption at the first decoded frame, not an error message.
+          $url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-lgpl-shared-9.0.zip'
           Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-extract
 
@@ -66,6 +69,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path publish/ffmpeg | Out-Null
           Get-ChildItem -Path ffmpeg-extract -Recurse -Filter *.dll |
             Copy-Item -Destination publish/ffmpeg -Force
+
+          # Fail the release now rather than shipping an app whose decoder cannot load.
+          foreach ($dll in 'avcodec-63.dll','avformat-63.dll','avutil-61.dll','swscale-10.dll') {
+            if (-not (Test-Path "publish/ffmpeg/$dll")) { throw "Missing $dll in the FFmpeg bundle" }
+          }
 
       - name: Install Velopack
         # Pinned to the Velopack library version in ISpy.App: vpk refuses to pack when the two
@@ -80,6 +88,8 @@ jobs:
           --packDir publish
           --mainExe ISpy.exe
           --packTitle "ISpy"
+          --packAuthors "ISpy"
+          --icon src/ISpy.App/Assets/ISpy.ico
           --outputDir releases
 
       - name: Publish the GitHub release

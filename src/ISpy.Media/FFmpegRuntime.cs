@@ -47,6 +47,8 @@ public static class FFmpegRuntime
 
                 // FFmpeg's default log level writes a great deal to stderr; we take warnings and up.
                 ffmpeg.av_log_set_level(ffmpeg.AV_LOG_WARNING);
+
+                _failure = CheckAbiVersions();
             }
             catch (Exception ex)
             {
@@ -68,6 +70,36 @@ public static class FFmpegRuntime
         if (Directory.Exists(beside)) return beside;
 
         return AppContext.BaseDirectory;
+    }
+
+    /// <summary>
+    /// Confirms the native libraries are the major versions these bindings were generated from.
+    /// </summary>
+    /// <remarks>
+    /// The struct offsets the bindings bake in are only valid for their own major version. With a
+    /// mismatched library every field access lands on the wrong bytes, which surfaces as memory
+    /// corruption and a dead process rather than an error - so the check has to happen up front,
+    /// using only version calls, which marshal no structs and are safe against any version.
+    /// </remarks>
+    private static string? CheckAbiVersions()
+    {
+        var mismatches = new List<string>();
+
+        Check(mismatches, "avcodec", ffmpeg.avcodec_version(), ffmpeg.LIBAVCODEC_VERSION_MAJOR);
+        Check(mismatches, "avformat", ffmpeg.avformat_version(), ffmpeg.LIBAVFORMAT_VERSION_MAJOR);
+        Check(mismatches, "avutil", ffmpeg.avutil_version(), ffmpeg.LIBAVUTIL_VERSION_MAJOR);
+        Check(mismatches, "swscale", ffmpeg.swscale_version(), ffmpeg.LIBSWSCALE_VERSION_MAJOR);
+
+        return mismatches.Count == 0
+            ? null
+            : "The bundled FFmpeg libraries do not match this build of ISpy " +
+              $"({string.Join(", ", mismatches)}). Reinstalling the app should fix this.";
+
+        static void Check(List<string> mismatches, string name, uint actual, int expected)
+        {
+            var actualMajor = (int)(actual >> 16);
+            if (actualMajor != expected) mismatches.Add($"{name} is v{actualMajor}, expected v{expected}");
+        }
     }
 
     /// <summary>Turns an FFmpeg negative error code into something a human can read.</summary>

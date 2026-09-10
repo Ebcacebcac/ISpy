@@ -200,8 +200,28 @@ public partial class PlaybackWindow : Window
         _session.SetSpeed(speed);
     }
 
+    private int _tickFailures;
+
     /// <summary>Draws a frame, advances the playhead, and drives skimming when running above 1x.</summary>
     private void OnTick(object? sender, EventArgs e)
+    {
+        try
+        {
+            Tick();
+            _tickFailures = 0;
+        }
+        catch (Exception ex)
+        {
+            if (_tickFailures++ == 0) ISpy.Core.Logs.Append("crash.log", $"playback tick: {ex}");
+            if (_tickFailures >= 50)
+            {
+                _ticker.Stop();
+                StatusText.Text = "Playback rendering failed - close and reopen this window.";
+            }
+        }
+    }
+
+    private void Tick()
     {
         var now = DateTime.UtcNow;
         var elapsed = now - _lastTick;

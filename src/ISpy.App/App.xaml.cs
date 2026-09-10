@@ -12,6 +12,8 @@ public partial class App : Application
     /// <summary>Held for the process lifetime; releasing it is what lets the next launch start.</summary>
     private Mutex? _singleInstance;
 
+    private int _handledDispatcherFailures;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         StartupTimeline.Mark("managed entry");
@@ -36,6 +38,13 @@ public partial class App : Application
             LogFatal(args.ExceptionObject as Exception);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
+        // A faulted task nobody awaited must not bring the process down at the next GC.
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            LogFatal(args.Exception);
+            args.SetObserved();
+        };
+
         // Nothing on the startup path may touch the network or block on I/O: the window is
         // constructed and shown first, and inventory loads only once it is on screen.
         new MainWindow().Show();
@@ -43,8 +52,28 @@ public partial class App : Application
         StartupTimeline.Mark("window shown");
     }
 
-    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e) =>
+    /// <summary>
+    /// A surveillance app must stay up: an unexpected error in one interaction is logged and
+    /// reported, and the cameras keep running. The cap exists because an exception thrown by
+    /// every dispatcher frame would otherwise become an endless dialog loop - past it, the crash
+    /// is allowed through and the log tells the story.
+    /// </summary>
+    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    {
         LogFatal(e.Exception);
+
+        if (_handledDispatcherFailures >= 5) return;
+        _handledDispatcherFailures++;
+
+        e.Handled = true;
+
+        MessageBox.Show(
+            "Something went wrong, but ISpy is still running." +
+            Environment.NewLine + Environment.NewLine + e.Exception.Message +
+            Environment.NewLine + Environment.NewLine + "Details were saved to:" +
+            Environment.NewLine + Path.Combine(AppPaths.LogDirectory, "crash.log"),
+            "ISpy", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
 
     protected override void OnExit(ExitEventArgs e)
     {

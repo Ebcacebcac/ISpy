@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:ISpy.App"
         Title="ISpy" Height="720" Width="1180"
+        Icon="Assets/ISpy.ico"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource Surface}"
         Foreground="{StaticResource Text}"
@@ -22,7 +23,11 @@
     <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{StaticResource SurfaceRaised}"
             BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="16,10">
       <DockPanel>
-        <TextBlock Text="ISpy" FontSize="15" FontWeight="SemiBold" />
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Image Source="Assets/ISpy-header.png" Width="20" Height="20" Margin="0,0,8,0"
+                 RenderOptions.BitmapScalingMode="HighQuality" />
+          <TextBlock Text="ISpy" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
         <TextBlock x:Name="UpdateIndicator" DockPanel.Dock="Right" Visibility="Collapsed"
                    VerticalAlignment="Center" Margin="12,0,0,0"
                    Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available"
@@ -73,7 +78,11 @@
     <!-- Status bar -->
     <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource SurfaceRaised}"
             BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,0" Padding="16,6">
-      <TextBlock x:Name="StartupText" Foreground="{StaticResource TextMuted}" FontSize="11" />
+      <DockPanel>
+        <TextBlock x:Name="VersionText" DockPanel.Dock="Right"
+                   Foreground="{StaticResource TextMuted}" FontSize="11" />
+        <TextBlock x:Name="StartupText" Foreground="{StaticResource TextMuted}" FontSize="11" />
+      </DockPanel>
     </Border>
   </Grid>
 </Window>

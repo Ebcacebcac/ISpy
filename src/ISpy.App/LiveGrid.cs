@@ -208,11 +208,37 @@ public sealed class LiveGrid : IDisposable
             ? [new TileRect(0, 0, _width, _height)]
             : TileLayout.Compute(Layout, _width, _height);
 
+    private int _consecutiveRenderFailures;
+
     /// <summary>Draws one frame. Bound to the compositor so we never render faster than the display.</summary>
     private void OnRendering(object? sender, EventArgs e)
     {
         if (_presenter is null) return;
 
+        try
+        {
+            RenderFrame();
+            _consecutiveRenderFailures = 0;
+        }
+        catch (Exception ex)
+        {
+            // A lost device (driver reset, remote session change) fails every frame; the streams
+            // keep decoding regardless, and endless dialog boxes help nobody. Log the first, and
+            // stop presenting after a sustained run of failures rather than spinning.
+            if (_consecutiveRenderFailures++ == 0)
+                Logs.Append("crash.log", $"render: {ex}");
+
+            if (_consecutiveRenderFailures >= 120 && _rendering)
+            {
+                CompositionTarget.Rendering -= OnRendering;
+                _rendering = false;
+                Logs.Append("crash.log", "render: giving up after sustained failures; restart ISpy to recover video.");
+            }
+        }
+    }
+
+    private void RenderFrame()
+    {
         var tiles = CurrentTiles();
         var visuals = new List<TileVisual>(tiles.Count);
 
@@ -229,7 +255,7 @@ public sealed class LiveGrid : IDisposable
             }
         }
 
-        _presenter.Present(visuals);
+        _presenter!.Present(visuals);
     }
 
     private static TileVisual ToVisual(GridEntry entry, TileRect tile, bool isSelected) =>

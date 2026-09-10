@@ -189,9 +189,15 @@ public sealed unsafe class VideoSurface : IDisposable
         using var decoded = new ID3D11Texture2D(texturePointer);
         decoded.AddRef();
 
+        // Decoder surfaces are allocated at coded size - the frame height rounded up for the
+        // codec's macroblock alignment, e.g. 1088 rows for 1080p video. Copying the whole
+        // subresource would write past the end of our display-sized texture, which is an invalid
+        // copy the driver answers with a device removal, taking the app down with it.
+        var region = new Vortice.Mathematics.Box(0, 0, 0, Width, Height, 1);
+
         _gpu.Context.CopySubresourceRegion(
             _texture!, 0, 0, 0, 0,
-            decoded, arraySlice);
+            decoded, arraySlice, region);
     }
 
     /// <summary>

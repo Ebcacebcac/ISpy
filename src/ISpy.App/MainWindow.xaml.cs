@@ -54,6 +54,7 @@ public partial class MainWindow : Window
         }
 
         StartupTimeline.Mark("inventory loaded");
+        ShowVersion();
         ShowStartupTimings();
         StartUpdateChecks();
     }
@@ -120,7 +121,17 @@ public partial class MainWindow : Window
     {
         if (_grid is null || _store is null) return;
 
-        _grid.Start();
+        try
+        {
+            _grid.Start();
+        }
+        catch (Exception ex)
+        {
+            Logs.Append("crash.log", $"starting streams: {ex}");
+            StatusText.Text = $"Could not start the cameras: {ex.Message}";
+            return;
+        }
+
         StartupTimeline.Mark("streams started");
 
         CanvasHint.Visibility = _grid.CameraCount == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -256,10 +267,21 @@ public partial class MainWindow : Window
 
             if (failures.Count > 0) StatusText.Text = string.Join("   ", failures);
         }
+        catch (Exception ex)
+        {
+            // An exception out of an async void handler ends the process; report it instead.
+            StatusText.Text = $"Refresh failed: {ex.Message}";
+        }
         finally
         {
             RefreshButton.IsEnabled = true;
         }
+    }
+
+    private void ShowVersion()
+    {
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText.Text = version is null ? "ISpy" : $"ISpy {version.ToString(3)}";
     }
 
     private void ShowStartupTimings()
