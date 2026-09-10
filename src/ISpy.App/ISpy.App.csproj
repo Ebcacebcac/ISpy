@@ -10,7 +10,10 @@
     <!-- Startup budget: no satellite assembly probing, no unnecessary JIT on the paint path. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <TieredPGO>true</TieredPGO>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Never set InvariantGlobalization here: WPF resolves the active keyboard layout's culture
+         (e.g. 0x0809, English UK) whenever a text box gets focus, and in invariant mode that
+         construction throws on the UI thread. It presented as "the app closes when I click into
+         the Add recorder dialog" - the few milliseconds ICU costs at startup are not worth it. -->
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="Assets/ISpy.ico" />

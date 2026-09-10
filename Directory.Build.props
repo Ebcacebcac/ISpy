@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Authors>ISpy</Authors>
     <Product>ISpy</Product>
   </PropertyGroup>
