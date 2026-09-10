@@ -84,10 +84,13 @@ public sealed class UpdateService : IDisposable
     }
 
     /// <summary>Looks for a newer release. Never throws.</summary>
+    /// <remarks>
+    /// Deliberately not gated on <see cref="IsEnabled"/>: that switch governs the background
+    /// timer, and a user who turned automatic checks off can still ask for one by hand - that is
+    /// the whole point of the settings button.
+    /// </remarks>
     public async Task<UpdateStatus> CheckAsync()
     {
-        if (!IsEnabled) return new UpdateStatus(false);
-
         if (!CanUpdate)
         {
             return new UpdateStatus(false,

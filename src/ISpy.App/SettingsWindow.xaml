@@ -1,0 +1,85 @@
+<Window x:Class="ISpy.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings - ISpy" Height="560" Width="560"
+        Icon="Assets/ISpy.ico"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Background="{StaticResource Surface}" Foreground="{StaticResource Text}"
+        TextOptions.TextFormattingMode="Display">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="22,18">
+
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+        <Image Source="Assets/ISpy-header.png" Width="22" Height="22" Margin="0,0,10,0"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+        <TextBlock Text="Settings" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Updates -->
+      <TextBlock Text="UPDATES" FontSize="11" FontWeight="SemiBold"
+                 Foreground="{StaticResource TextMuted}" Margin="0,0,0,6" />
+      <Border Background="{StaticResource SurfaceRaised}" BorderBrush="{StaticResource Border}"
+              BorderThickness="1" CornerRadius="4" Padding="14,12" Margin="0,0,0,18">
+        <StackPanel>
+          <DockPanel>
+            <Button x:Name="CheckButton" DockPanel.Dock="Right" Content="Check for updates"
+                    Padding="12,5" Click="OnCheckForUpdates" />
+            <TextBlock x:Name="VersionText" VerticalAlignment="Center" FontWeight="SemiBold" />
+          </DockPanel>
+
+          <TextBlock x:Name="UpdateStatusText" Margin="0,8,0,0" TextWrapping="Wrap"
+                     Foreground="{StaticResource TextMuted}" />
+
+          <Button x:Name="InstallButton" Content="Install and restart" Padding="12,5"
+                  Margin="0,8,0,0" HorizontalAlignment="Left" Visibility="Collapsed"
+                  Click="OnInstallUpdate" />
+
+          <CheckBox x:Name="AutoUpdateBox" Margin="0,12,0,0"
+                    Foreground="{StaticResource Text}"
+                    Checked="OnAutoUpdateToggled" Unchecked="OnAutoUpdateToggled"
+                    Content="Check for updates automatically" />
+          <TextBlock Margin="22,2,0,0" FontSize="11" Foreground="{StaticResource TextMuted}"
+                     TextWrapping="Wrap"
+                     Text="Checks run in the background after startup and every six hours, never on the startup path. Updates install only when you choose." />
+        </StackPanel>
+      </Border>
+
+      <!-- Recorders -->
+      <TextBlock Text="RECORDERS" FontSize="11" FontWeight="SemiBold"
+                 Foreground="{StaticResource TextMuted}" Margin="0,0,0,6" />
+      <Border Background="{StaticResource SurfaceRaised}" BorderBrush="{StaticResource Border}"
+              BorderThickness="1" CornerRadius="4" Padding="14,12" Margin="0,0,0,18">
+        <StackPanel>
+          <ListBox x:Name="DeviceList" Background="Transparent" BorderThickness="0"
+                   Foreground="{StaticResource Text}" MaxHeight="160" />
+          <TextBlock x:Name="NoDevicesText" Foreground="{StaticResource TextMuted}"
+                     Text="No recorders saved." Visibility="Collapsed" />
+          <Button x:Name="RemoveButton" Content="Remove selected" Padding="12,5"
+                  Margin="0,8,0,0" HorizontalAlignment="Left" Click="OnRemoveDevice" />
+          <TextBlock Margin="0,4,0,0" FontSize="11" Foreground="{StaticResource TextMuted}"
+                     TextWrapping="Wrap"
+                     Text="Removing a recorder forgets its cameras and stored password. Footage on the recorder itself is untouched." />
+        </StackPanel>
+      </Border>
+
+      <!-- Diagnostics -->
+      <TextBlock Text="DIAGNOSTICS" FontSize="11" FontWeight="SemiBold"
+                 Foreground="{StaticResource TextMuted}" Margin="0,0,0,6" />
+      <Border Background="{StaticResource SurfaceRaised}" BorderBrush="{StaticResource Border}"
+              BorderThickness="1" CornerRadius="4" Padding="14,12">
+        <StackPanel>
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Open logs folder" Padding="12,5"
+                    Click="OnOpenLogs" />
+            <TextBlock x:Name="LogPathText" VerticalAlignment="Center" TextWrapping="Wrap"
+                       Foreground="{StaticResource TextMuted}" FontSize="11" />
+          </DockPanel>
+          <TextBlock Margin="0,6,0,0" FontSize="11" Foreground="{StaticResource TextMuted}"
+                     TextWrapping="Wrap"
+                     Text="Startup timings, connection diagnostics and crash details live here. Nothing is sent anywhere - the logs stay on this PC unless you share them." />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+</Window>

@@ -320,6 +320,28 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnOpenSettings(object sender, RoutedEventArgs e)
+    {
+        if (_store is null) return;
+
+        var settings = new SettingsWindow(
+            _store,
+            _updates,
+            beforeUpdateRestart: () => Dispatcher.Invoke(() => _grid?.Dispose()))
+        {
+            Owner = this,
+        };
+
+        settings.ShowDialog();
+
+        // A removed recorder means the grid is showing streams that no longer exist.
+        if (settings.DevicesChanged)
+        {
+            RenderInventory();
+            StartStreams();
+        }
+    }
+
     private void OnOpenPlayback(object sender, RoutedEventArgs e)
     {
         if (_store is null) return;

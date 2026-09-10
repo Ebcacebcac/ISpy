@@ -34,6 +34,8 @@
                    MouseLeftButtonUp="OnUpdateClicked" />
         <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Add recorder" Padding="12,4"
                 Margin="8,0,0,0" Click="OnAddDevice" />
+        <Button x:Name="SettingsButton" DockPanel.Dock="Right" Content="Settings" Padding="12,4"
+                Margin="8,0,0,0" Click="OnOpenSettings" />
         <ComboBox x:Name="LayoutPicker" DockPanel.Dock="Right" MinWidth="110" Margin="8,0,8,0"
                   VerticalAlignment="Center" SelectionChanged="OnLayoutPicked" />
         <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh" Padding="12,4"
