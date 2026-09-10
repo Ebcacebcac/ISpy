@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace ISpy.Tests;
@@ -31,6 +32,12 @@ internal sealed class FakeNvr : IDisposable
 
     public int Port { get; }
     public string Host => "localhost";
+
+    /// <summary>When set, every request must carry a valid Digest Authorization for these.</summary>
+    public (string User, string Password)? RequireDigest { get; set; }
+
+    private const string Realm = "ISpy-Test";
+    private const string Nonce = "0123456789abcdef0123456789abcdef";
 
     /// <summary>Requests the fake has received, so tests can assert what was actually asked for.</summary>
     public List<string> Requests { get; } = [];
@@ -99,6 +106,15 @@ internal sealed class FakeNvr : IDisposable
             var path = context.Request.Url?.AbsolutePath ?? "";
             lock (Requests) Requests.Add(path);
 
+            if (RequireDigest is { } creds && !DigestOk(context.Request, creds))
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+                context.Response.AddHeader("WWW-Authenticate",
+                    $"Digest realm=\"{Realm}\", qop=\"auth\", nonce=\"{Nonce}\"");
+                context.Response.Close();
+                continue;
+            }
+
             var (status, body) = _routes.TryGetValue(path, out var route)
                 ? route
                 : (HttpStatusCode.NotFound, "<ResponseStatus><statusCode>4</statusCode></ResponseStatus>");
@@ -119,6 +135,33 @@ internal sealed class FakeNvr : IDisposable
             }
         }
     }
+
+    /// <summary>Verifies the request's Digest response the way real firmware would.</summary>
+    private static bool DigestOk(HttpListenerRequest request, (string User, string Password) creds)
+    {
+        var header = request.Headers["Authorization"];
+        if (header is null || !header.StartsWith("Digest", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var fields = header["Digest".Length..]
+            .Split(',')
+            .Select(part => part.Split('=', 2))
+            .Where(kv => kv.Length == 2)
+            .ToDictionary(kv => kv[0].Trim(), kv => kv[1].Trim().Trim('"'), StringComparer.OrdinalIgnoreCase);
+
+        if (!fields.TryGetValue("response", out var response)) return false;
+
+        var ha1 = Md5($"{creds.User}:{Realm}:{creds.Password}");
+        var ha2 = Md5($"{request.HttpMethod}:{fields.GetValueOrDefault("uri")}");
+
+        var expected = fields.TryGetValue("qop", out var qop) && qop.Length > 0
+            ? Md5($"{ha1}:{Nonce}:{fields.GetValueOrDefault("nc")}:{fields.GetValueOrDefault("cnonce")}:{qop}:{ha2}")
+            : Md5($"{ha1}:{Nonce}:{ha2}");
+
+        return string.Equals(expected, response, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Md5(string input) =>
+        Convert.ToHexStringLower(MD5.HashData(Encoding.UTF8.GetBytes(input)));
 
     private static int FreePort()
     {

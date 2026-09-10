@@ -23,6 +23,23 @@ public class OnboardingTests : IDisposable
     };
 
     [Fact]
+    public async Task Onboarding_authenticates_through_a_real_digest_challenge()
+    {
+        // The fake refuses every request until it carries a valid Digest response - so this only
+        // passes if DigestAuthHandler completes the handshake the way the firmware expects.
+        using var nvr = new FakeNvr().WithTypicalRecorder();
+        nvr.RequireDigest = ("admin", "hunter2");
+        using var store = NewStore();
+
+        var wrong = await new DeviceOnboarding(store).AddAsync(Target(nvr), "admin", "nope");
+        Assert.Equal(OnboardStatus.BadCredentials, wrong.Status);
+
+        var right = await new DeviceOnboarding(store).AddAsync(Target(nvr), "admin", "hunter2");
+        Assert.True(right.IsSuccess);
+        Assert.Equal(2, right.Channels!.Count);
+    }
+
+    [Fact]
     public async Task Adding_a_recorder_saves_it_with_its_cameras()
     {
         using var nvr = new FakeNvr().WithTypicalRecorder();

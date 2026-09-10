@@ -16,7 +16,8 @@ public sealed class IsapiException(string message, HttpStatusCode? status = null
 
 /// <summary>
 /// Talks ISAPI, the HTTP/XML control API on Hikvision-family devices. Authentication is HTTP
-/// Digest, which .NET negotiates for us once the handler has credentials.
+/// Digest, performed by <see cref="DigestAuthHandler"/> because the framework's built-in Digest is
+/// unreliable against this family's firmware.
 /// </summary>
 public sealed class IsapiClient : IDisposable
 {
@@ -27,17 +28,17 @@ public sealed class IsapiClient : IDisposable
     {
         _baseUrl = HikvisionUrls.IsapiBase(host, httpPort);
 
-        var handler = new SocketsHttpHandler
+        var transport = new SocketsHttpHandler
         {
-            Credentials = new NetworkCredential(username, password),
-
-            // Send the digest header on subsequent requests instead of paying a 401 round trip for
-            // every single call. Channel enumeration alone is several requests.
-            PreAuthenticate = true,
             AllowAutoRedirect = false,
             ConnectTimeout = TimeSpan.FromSeconds(4),
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
         };
+
+        // We drive Digest ourselves rather than through the handler's Credentials: the built-in
+        // implementation fails against this family's firmware, whereas DigestAuthHandler is tested
+        // against the RFC vector and caches the challenge so repeat calls stay cheap.
+        var handler = new DigestAuthHandler(username, password, transport);
 
         _http = new HttpClient(handler)
         {
