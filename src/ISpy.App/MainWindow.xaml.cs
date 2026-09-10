@@ -148,68 +148,151 @@ public partial class MainWindow : Window
 
     // ---- layout picker ---------------------------------------------------
 
-    /// <summary>Sentinel item at the bottom of the picker that opens the designer.</summary>
-    private sealed record NewLayoutItem
-    {
-        public override string ToString() => "New custom layout…";
-    }
-
-    private sealed record LayoutItem(LayoutSpec Spec)
-    {
-        public override string ToString() => Spec.Name;
-    }
-
     private const string CustomLayoutsSetting = "layouts.custom";
-    private bool _updatingPicker;
 
+    /// <summary>
+    /// Fills the picker panel: built-in presets as thumbnails grouped Standard/Wide, saved custom
+    /// layouts, and an Add tile that opens the designer - the arrangement people know from the
+    /// vendor clients, drawn from the same geometry the live grid uses.
+    /// </summary>
     private void PopulateLayoutPicker()
     {
         if (_store is null || _grid is null) return;
 
-        _updatingPicker = true;
-        LayoutPicker.Items.Clear();
+        StandardLayouts.Children.Clear();
+        WideLayouts.Children.Clear();
+        CustomLayouts.Children.Clear();
 
         foreach (var spec in LayoutSpec.BuiltIn)
-            LayoutPicker.Items.Add(new LayoutItem(spec));
+        {
+            var panel = spec.Category == "Wide" ? WideLayouts : StandardLayouts;
+            panel.Children.Add(CreateLayoutTile(spec, isCustom: false));
+        }
 
         foreach (var spec in LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting)))
-            LayoutPicker.Items.Add(new LayoutItem(spec));
+            CustomLayouts.Children.Add(CreateLayoutTile(spec, isCustom: true));
 
-        LayoutPicker.Items.Add(new NewLayoutItem());
-
-        LayoutPicker.SelectedItem = LayoutPicker.Items.OfType<LayoutItem>()
-            .FirstOrDefault(item => item.Spec.Name == _grid.Layout.Name);
-
-        _updatingPicker = false;
+        CustomLayouts.Children.Add(CreateAddTile());
     }
 
-    private void OnLayoutPicked(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private System.Windows.Controls.Button CreateLayoutTile(LayoutSpec spec, bool isCustom)
     {
-        if (_updatingPicker || _grid is null || _store is null) return;
+        var stack = new System.Windows.Controls.StackPanel();
 
-        switch (LayoutPicker.SelectedItem)
+        stack.Children.Add(new LayoutThumbnail
         {
-            case LayoutItem item:
-                _grid.SetLayout(item.Spec);
-                break;
+            Spec = spec,
+            Width = 62,
+            Height = 42,
+        });
 
-            case NewLayoutItem:
-                var editor = new LayoutEditorWindow { Owner = this };
+        stack.Children.Add(new System.Windows.Controls.TextBlock
+        {
+            Text = spec.Name,
+            FontSize = 11,
+            Margin = new Thickness(0, 4, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = (System.Windows.Media.Brush)FindResource(
+                _grid?.Layout.Name == spec.Name ? "Accent" : "TextMuted"),
+            MaxWidth = 62,
+            TextTrimming = System.Windows.TextTrimming.CharacterEllipsis,
+        });
 
-                if (editor.ShowDialog() == true && editor.Result is { } created)
-                {
-                    // Saved custom layouts live in settings; same-named ones are replaced.
-                    var customs = LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting));
-                    customs.RemoveAll(spec => spec.Name == created.Name);
-                    customs.Add(created);
-                    _store.SetSetting(CustomLayoutsSetting, LayoutSpec.ListToJson(customs));
+        var tile = new System.Windows.Controls.Button
+        {
+            Content = stack,
+            Margin = new Thickness(2),
+            Padding = new Thickness(6, 6, 6, 4),
+            ToolTip = $"{spec.Name} · {spec.TileCount} tiles",
+        };
 
-                    _grid.SetLayout(created);
-                }
+        if (_grid?.Layout.Name == spec.Name)
+            tile.BorderBrush = (System.Windows.Media.Brush)FindResource("Accent");
 
-                PopulateLayoutPicker();
-                break;
+        tile.Click += (_, _) =>
+        {
+            _grid?.SetLayout(spec);
+            LayoutPopup.IsOpen = false;
+            PopulateLayoutPicker();
+        };
+
+        if (isCustom)
+        {
+            var menu = new System.Windows.Controls.ContextMenu();
+
+            var edit = new System.Windows.Controls.MenuItem { Header = "Edit…" };
+            edit.Click += (_, _) => EditCustomLayout(spec);
+
+            var delete = new System.Windows.Controls.MenuItem { Header = "Delete" };
+            delete.Click += (_, _) => DeleteCustomLayout(spec);
+
+            menu.Items.Add(edit);
+            menu.Items.Add(delete);
+            tile.ContextMenu = menu;
         }
+
+        return tile;
+    }
+
+    private System.Windows.Controls.Button CreateAddTile()
+    {
+        var tile = new System.Windows.Controls.Button
+        {
+            Content = new System.Windows.Controls.TextBlock
+            {
+                Text = "+ Add",
+                Foreground = (System.Windows.Media.Brush)FindResource("Accent"),
+            },
+            Margin = new Thickness(2),
+            MinWidth = 74,
+            MinHeight = 62,
+            ToolTip = "Design a custom layout",
+        };
+
+        tile.Click += (_, _) =>
+        {
+            LayoutPopup.IsOpen = false;
+            EditCustomLayout(existing: null);
+        };
+
+        return tile;
+    }
+
+    private void EditCustomLayout(LayoutSpec? existing)
+    {
+        if (_store is null || _grid is null) return;
+
+        var editor = new LayoutEditorWindow(existing) { Owner = this };
+
+        if (editor.ShowDialog() == true && editor.Result is { } saved)
+        {
+            var customs = LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting));
+
+            // Same-named layouts are replaced; a rename during edit removes the original too.
+            customs.RemoveAll(spec => spec.Name == saved.Name);
+            if (existing is not null) customs.RemoveAll(spec => spec.Name == existing.Name);
+            customs.Add(saved);
+
+            _store.SetSetting(CustomLayoutsSetting, LayoutSpec.ListToJson(customs));
+            _grid.SetLayout(saved);
+        }
+
+        PopulateLayoutPicker();
+    }
+
+    private void DeleteCustomLayout(LayoutSpec spec)
+    {
+        if (_store is null) return;
+
+        var customs = LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting));
+        customs.RemoveAll(candidate => candidate.Name == spec.Name);
+        _store.SetSetting(CustomLayoutsSetting, LayoutSpec.ListToJson(customs));
+
+        // The layout being deleted may be on screen; fall back to a sensible preset.
+        if (_grid is not null && _grid.Layout.Name == spec.Name)
+            _grid.SetLayout(LayoutSpec.FitFor(_grid.CameraCount));
+
+        PopulateLayoutPicker();
     }
 
     // ---- mouse on the video canvas ---------------------------------------

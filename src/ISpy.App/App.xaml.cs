@@ -34,6 +34,11 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        // Every window the app ever opens gets the dark native title bar, without each window
+        // having to remember to ask.
+        EventManager.RegisterClassHandler(typeof(Window), Window.LoadedEvent,
+            new RoutedEventHandler((sender, _) => WindowStyling.ApplyDarkChrome((Window)sender)));
+
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             LogFatal(args.ExceptionObject as Exception);
         DispatcherUnhandledException += OnDispatcherUnhandledException;

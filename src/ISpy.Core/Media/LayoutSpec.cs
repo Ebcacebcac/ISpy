@@ -39,6 +39,9 @@ public sealed record LayoutSpec
     /// <summary>True for the presets that ship with the app; those are never saved or deleted.</summary>
     public bool IsBuiltIn { get; init; }
 
+    /// <summary>Picker grouping: "Standard", "Wide", or "Custom" for user-made layouts.</summary>
+    public string Category { get; init; } = "Standard";
+
     public int TileCount => Cells.Count;
 
     /// <summary>Cells in camera-assignment order: reading order of top-left corners.</summary>
@@ -83,16 +86,21 @@ public sealed record LayoutSpec
 
     // ---- presets ---------------------------------------------------------
 
-    public static LayoutSpec Uniform(string name, int side) => new LayoutSpec
-    {
-        Name = name,
-        Columns = side,
-        Rows = side,
-        IsBuiltIn = true,
-        Cells = Enumerable.Range(0, side * side)
-            .Select(i => new LayoutCell(i % side, i / side))
-            .ToArray(),
-    }.Sorted();
+    public static LayoutSpec Uniform(string name, int side) => Grid(name, side, side);
+
+    /// <summary>A plain grid of single-cell tiles; non-square shapes make the wide presets.</summary>
+    public static LayoutSpec Grid(string name, int columns, int rows, string category = "Standard") =>
+        new LayoutSpec
+        {
+            Name = name,
+            Columns = columns,
+            Rows = rows,
+            IsBuiltIn = true,
+            Category = category,
+            Cells = Enumerable.Range(0, columns * rows)
+                .Select(i => new LayoutCell(i % columns, i / columns))
+                .ToArray(),
+        }.Sorted();
 
     /// <summary>A hero tile of (side-1) cells square in the top-left, small tiles down the right and along the bottom.</summary>
     public static LayoutSpec Hero(string name, int side)
@@ -113,14 +121,49 @@ public sealed record LayoutSpec
     }
 
     public static readonly LayoutSpec Single = Uniform("1", 1);
-    public static readonly LayoutSpec TwoByTwo = Uniform("2 x 2", 2);
-    public static readonly LayoutSpec ThreeByThree = Uniform("3 x 3", 3);
-    public static readonly LayoutSpec FourByFour = Uniform("4 x 4", 4);
-    public static readonly LayoutSpec OnePlusFive = Hero("1 + 5", 3);
-    public static readonly LayoutSpec OnePlusSeven = Hero("1 + 7", 4);
+    public static readonly LayoutSpec TwoByTwo = Uniform("4", 2);
+    public static readonly LayoutSpec ThreeByThree = Uniform("9", 3);
+    public static readonly LayoutSpec FourByFour = Uniform("16", 4);
+    public static readonly LayoutSpec FiveByFive = Uniform("25", 5);
+    public static readonly LayoutSpec OnePlusFive = Hero("6", 3);
+    public static readonly LayoutSpec OnePlusSeven = Hero("8", 4);
+    public static readonly LayoutSpec OnePlusTwelve = HeroSmall("13", 4);
+
+    public static readonly LayoutSpec WideSixteenNine = Grid("2 x 1", 2, 1, "Wide");
+    public static readonly LayoutSpec WideSix = Grid("3 x 2", 3, 2, "Wide");
+    public static readonly LayoutSpec WideEight = Grid("4 x 2", 4, 2, "Wide");
+    public static readonly LayoutSpec WideTwelve = Grid("4 x 3", 4, 3, "Wide");
+
+    /// <summary>A 2x2 hero in the top-left of the grid, every other cell a single tile.</summary>
+    public static LayoutSpec HeroSmall(string name, int side)
+    {
+        var cells = new List<LayoutCell> { new(0, 0, 2, 2) };
+
+        for (var row = 0; row < side; row++)
+        {
+            for (var column = 0; column < side; column++)
+            {
+                if (column < 2 && row < 2) continue;
+                cells.Add(new LayoutCell(column, row));
+            }
+        }
+
+        return new LayoutSpec
+        {
+            Name = name,
+            Columns = side,
+            Rows = side,
+            IsBuiltIn = true,
+            Cells = cells,
+        }.Sorted();
+    }
 
     public static readonly IReadOnlyList<LayoutSpec> BuiltIn =
-        [Single, TwoByTwo, OnePlusFive, ThreeByThree, OnePlusSeven, FourByFour];
+    [
+        Single, TwoByTwo, OnePlusFive, OnePlusSeven, ThreeByThree,
+        OnePlusTwelve, FourByFour, FiveByFive,
+        WideSixteenNine, WideSix, WideEight, WideTwelve,
+    ];
 
     /// <summary>
     /// The preset that suits a camera count. Hero layouts are preferred where they fit exactly-ish,
@@ -133,7 +176,9 @@ public sealed record LayoutSpec
         <= 6 => OnePlusFive,
         <= 8 => OnePlusSeven,
         <= 9 => ThreeByThree,
-        _ => FourByFour,
+        <= 13 => OnePlusTwelve,
+        <= 16 => FourByFour,
+        _ => FiveByFive,
     };
 
     // ---- persistence -----------------------------------------------------

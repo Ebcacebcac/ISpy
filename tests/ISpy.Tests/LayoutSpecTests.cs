@@ -133,13 +133,47 @@ public class LayoutSpecTests
 
     [Theory]
     [InlineData(1, "1")]
-    [InlineData(4, "2 x 2")]
-    [InlineData(6, "1 + 5")]
-    [InlineData(8, "1 + 7")]
-    [InlineData(9, "3 x 3")]
-    [InlineData(14, "4 x 4")]
+    [InlineData(4, "4")]
+    [InlineData(6, "6")]
+    [InlineData(8, "8")]
+    [InlineData(9, "9")]
+    [InlineData(12, "13")]
+    [InlineData(14, "16")]
+    [InlineData(20, "25")]
     public void The_fitting_preset_prefers_hero_layouts(int cameras, string expected) =>
         Assert.Equal(expected, LayoutSpec.FitFor(cameras).Name);
+
+    [Fact]
+    public void The_thirteen_layout_is_a_small_hero_with_twelve_singles()
+    {
+        var spec = LayoutSpec.OnePlusTwelve;
+
+        Assert.Equal(13, spec.TileCount);
+        Assert.Empty(spec.Validate());
+
+        var hero = spec.Cells[0];
+        Assert.Equal((0, 0, 2, 2), (hero.Column, hero.Row, hero.ColumnSpan, hero.RowSpan));
+        Assert.Equal(12, spec.Cells.Count(c => c.ColumnSpan == 1 && c.RowSpan == 1));
+    }
+
+    [Fact]
+    public void Wide_presets_are_grouped_for_the_picker()
+    {
+        Assert.All(new[] { LayoutSpec.WideSix, LayoutSpec.WideEight, LayoutSpec.WideTwelve },
+            spec =>
+            {
+                Assert.Equal("Wide", spec.Category);
+                Assert.Empty(spec.Validate());
+                Assert.True(spec.Columns > spec.Rows);
+            });
+    }
+
+    [Fact]
+    public void Category_survives_the_json_round_trip()
+    {
+        var restored = LayoutSpec.FromJson(LayoutSpec.WideSix.ToJson());
+        Assert.Equal("Wide", restored!.Category);
+    }
 }
 
 public class SpecGeometryTests

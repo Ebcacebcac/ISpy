@@ -30,7 +30,7 @@
         <Button x:Name="ExportButton" DockPanel.Dock="Right" Content="Save clip…" Padding="12,4"
                 Margin="8,0,0,0" Click="OnExport" IsEnabled="False" />
         <Button x:Name="LoadButton" DockPanel.Dock="Right" Content="Load day" Padding="12,4"
-                Click="OnLoadDay" />
+                Style="{StaticResource PrimaryButton}" Click="OnLoadDay" />
         <DatePicker x:Name="DayPicker" DockPanel.Dock="Right" Width="130" Margin="0,0,8,0" />
         <TextBlock x:Name="StatusText" Margin="14,0,0,0" VerticalAlignment="Center"
                    Foreground="{StaticResource TextMuted}" Text="Pick a camera." />

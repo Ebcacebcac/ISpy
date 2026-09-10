@@ -31,6 +31,7 @@
                      Foreground="{StaticResource TextMuted}" />
 
           <Button x:Name="InstallButton" Content="Install and restart" Padding="12,5"
+                  Style="{StaticResource PrimaryButton}"
                   Margin="0,8,0,0" HorizontalAlignment="Left" Visibility="Collapsed"
                   Click="OnInstallUpdate" />
 

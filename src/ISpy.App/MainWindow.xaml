@@ -33,11 +33,38 @@
                    Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available"
                    MouseLeftButtonUp="OnUpdateClicked" />
         <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Add recorder" Padding="12,4"
-                Margin="8,0,0,0" Click="OnAddDevice" />
+                Style="{StaticResource PrimaryButton}" Margin="8,0,0,0" Click="OnAddDevice" />
         <Button x:Name="SettingsButton" DockPanel.Dock="Right" Content="Settings" Padding="12,4"
                 Margin="8,0,0,0" Click="OnOpenSettings" />
-        <ComboBox x:Name="LayoutPicker" DockPanel.Dock="Right" MinWidth="110" Margin="8,0,8,0"
-                  VerticalAlignment="Center" SelectionChanged="OnLayoutPicked" />
+        <Grid DockPanel.Dock="Right" Margin="8,0,8,0" VerticalAlignment="Center">
+          <ToggleButton x:Name="LayoutButton" Padding="12,4">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="Layout" />
+              <Path Data="M 0,0 L 4,4 L 8,0" Stroke="{StaticResource TextMuted}" StrokeThickness="1.5"
+                    VerticalAlignment="Center" Margin="8,1,0,0" />
+            </StackPanel>
+          </ToggleButton>
+          <Popup x:Name="LayoutPopup" PlacementTarget="{Binding ElementName=LayoutButton}"
+                 Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                 IsOpen="{Binding IsChecked, ElementName=LayoutButton, Mode=TwoWay}">
+            <Border Background="{StaticResource SurfaceRaised}" BorderBrush="{StaticResource BorderLight}"
+                    BorderThickness="1" CornerRadius="8" Margin="0,6,10,10" Padding="14" MaxWidth="430">
+              <StackPanel>
+                <TextBlock Text="STANDARD" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextMuted}" Margin="2,0,0,6" />
+                <WrapPanel x:Name="StandardLayouts" />
+                <TextBlock Text="WIDE" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextMuted}" Margin="2,10,0,6" />
+                <WrapPanel x:Name="WideLayouts" />
+                <TextBlock Text="CUSTOM" FontSize="10" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextMuted}" Margin="2,10,0,6" />
+                <WrapPanel x:Name="CustomLayouts" />
+                <TextBlock FontSize="11" Foreground="{StaticResource TextMuted}" Margin="2,8,0,0"
+                           Text="Right-click a custom layout to edit or delete it." />
+              </StackPanel>
+            </Border>
+          </Popup>
+        </Grid>
         <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh" Padding="12,4"
                 Click="OnRefresh" />
         <Button x:Name="PlaybackButton" DockPanel.Dock="Right" Content="Playback" Padding="12,4"
