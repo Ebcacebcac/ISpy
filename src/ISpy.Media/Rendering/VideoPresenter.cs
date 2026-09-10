@@ -170,17 +170,17 @@ public sealed class VideoPresenter : IDisposable
 
         foreach (var visual in tiles)
         {
-            var surface = visual.Surface;
-            if (!surface.HasContent || surface.Luma is null || surface.Chroma is null) continue;
+            if (!visual.Surface.TryGetDrawState(out var luma, out var chroma, out var width, out var height))
+                continue;
 
             // Preserve the camera's aspect ratio inside its tile rather than stretching it.
-            var target = TileLayout.Letterbox(visual.Tile, surface.Width, surface.Height);
+            var target = TileLayout.Letterbox(visual.Tile, width, height);
             if (target.Width <= 0 || target.Height <= 0) continue;
 
             WriteConstants(target);
 
-            context.PSSetShaderResource(0, surface.Luma);
-            context.PSSetShaderResource(1, surface.Chroma);
+            context.PSSetShaderResource(0, luma);
+            context.PSSetShaderResource(1, chroma);
             context.Draw(4, 0);
         }
 

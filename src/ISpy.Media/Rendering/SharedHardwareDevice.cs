@@ -1,5 +1,4 @@
 using FFmpeg.AutoGen;
-using Vortice.Direct3D11;
 
 namespace ISpy.Media.Rendering;
 
@@ -33,14 +32,6 @@ public sealed unsafe class SharedHardwareDevice : IDisposable
     public static SharedHardwareDevice? Create(GpuDevice gpu)
     {
         if (!FFmpegRuntime.EnsureInitialised()) return null;
-
-        // Several decode threads drive one immediate context, so the device must serialise its own
-        // access. Without this the driver corrupts state under load in ways that look like random
-        // decode failures.
-        using (var multithread = gpu.Device.QueryInterfaceOrNull<ID3D11Multithread>())
-        {
-            multithread?.SetMultithreadProtected(true);
-        }
 
         var reference = ffmpeg.av_hwdevice_ctx_alloc(AVHWDeviceType.AV_HWDEVICE_TYPE_D3D11VA);
         if (reference is null) return null;

@@ -84,7 +84,16 @@ public sealed unsafe class GpuDevice : IDisposable
             result.CheckError();
         }
 
-        return new GpuDevice(device!, context!, ownsDevice: true);
+        // Decode threads and the render thread both drive this one immediate context, so the
+        // device must serialise its own access. This is set here rather than alongside the
+        // hardware-decode setup because the software decode path shares the context too - and that
+        // is precisely the path taken when hardware decoding was unavailable.
+        using (var multithread = device!.QueryInterfaceOrNull<ID3D11Multithread>())
+        {
+            multithread?.SetMultithreadProtected(true);
+        }
+
+        return new GpuDevice(device, context!, ownsDevice: true);
     }
 
     public void Dispose()

@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using FFmpeg.AutoGen;
 using ISpy.Core.Media;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
 using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
+using ID3D11ShaderResourceView = Vortice.Direct3D11.ID3D11ShaderResourceView;
 using ID3D11Texture2D = Vortice.Direct3D11.ID3D11Texture2D;
 using MapFlags = Vortice.Direct3D11.MapFlags;
 
@@ -32,6 +34,13 @@ public sealed unsafe class VideoSurface : IDisposable
     private SwsContext* _scaler;
     private AVPixelFormat _scalerSource = AVPixelFormat.AV_PIX_FMT_NONE;
 
+    /// <summary>
+    /// Guards the textures and their views. D3D itself is made thread-safe by multithread
+    /// protection, but that does not stop the renderer reading these fields while the decode thread
+    /// is replacing them after a resolution change - which would draw from a disposed view.
+    /// </summary>
+    private readonly Lock _gate = new();
+
     public VideoSurface(GpuDevice gpu) => _gpu = gpu;
 
     public int Width { get; private set; }
@@ -51,6 +60,14 @@ public sealed unsafe class VideoSurface : IDisposable
     {
         if (width < 2 || height < 2) return;
 
+        lock (_gate)
+        {
+            SetPosterCore(bgra, width, height);
+        }
+    }
+
+    private void SetPosterCore(ReadOnlySpan<byte> bgra, int width, int height)
+    {
         EnsureTextures(width, height);
         if (_texture is null || _staging is null) return;
 
@@ -77,6 +94,11 @@ public sealed unsafe class VideoSurface : IDisposable
     /// stalls the pipeline, so this is only ever called on shutdown.
     /// </summary>
     public byte[]? ReadBack()
+    {
+        lock (_gate) return ReadBackCore();
+    }
+
+    private byte[]? ReadBackCore()
     {
         if (_texture is null || Width < 2 || Height < 2) return null;
 
@@ -114,19 +136,43 @@ public sealed unsafe class VideoSurface : IDisposable
     {
         if (info.Width <= 0 || info.Height <= 0) return;
 
-        EnsureTextures(info.Width, info.Height);
-        if (_texture is null) return;
-
-        if (info.IsHardware)
+        lock (_gate)
         {
-            CopyFromDecoderTexture(frame);
-        }
-        else
-        {
-            CopyFromSystemMemory(frame, info);
-        }
+            EnsureTextures(info.Width, info.Height);
+            if (_texture is null) return;
 
-        HasContent = true;
+            if (info.IsHardware)
+            {
+                CopyFromDecoderTexture(frame);
+            }
+            else
+            {
+                CopyFromSystemMemory(frame, info);
+            }
+
+            HasContent = true;
+        }
+    }
+
+    /// <summary>
+    /// Hands the renderer everything it needs for one draw, taken atomically. Returns false when
+    /// there is nothing to draw yet.
+    /// </summary>
+    public bool TryGetDrawState(
+        [NotNullWhen(true)] out ID3D11ShaderResourceView? luma,
+        [NotNullWhen(true)] out ID3D11ShaderResourceView? chroma,
+        out int width,
+        out int height)
+    {
+        lock (_gate)
+        {
+            luma = _luma;
+            chroma = _chroma;
+            width = Width;
+            height = Height;
+
+            return HasContent && luma is not null && chroma is not null;
+        }
     }
 
     /// <summary>
@@ -274,7 +320,10 @@ public sealed unsafe class VideoSurface : IDisposable
 
     public void Dispose()
     {
-        ReleaseTextures();
-        ReleaseScaler();
+        lock (_gate)
+        {
+            ReleaseTextures();
+            ReleaseScaler();
+        }
     }
 }
