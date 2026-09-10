@@ -24,6 +24,10 @@
         <TextBlock Text="ISpy" FontSize="15" FontWeight="SemiBold" />
         <TextBlock x:Name="UpdateIndicator" DockPanel.Dock="Right" Visibility="Collapsed"
                    Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available" />
+        <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Add recorder" Padding="12,4"
+                Margin="8,0,0,0" Click="OnAddDevice" />
+        <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh" Padding="12,4"
+                Click="OnRefresh" />
         <TextBlock x:Name="StatusText" Margin="16,0,0,0" VerticalAlignment="Center"
                    Foreground="{StaticResource TextMuted}" Text="Starting…" />
       </DockPanel>
@@ -37,7 +41,7 @@
                    FontSize="11" FontWeight="SemiBold" Text="CAMERAS" />
         <TextBlock x:Name="EmptyHint" DockPanel.Dock="Top" Margin="16,4,16,0" TextWrapping="Wrap"
                    Foreground="{StaticResource TextMuted}" Visibility="Collapsed"
-                   Text="No recorder saved yet. Discovery arrives in the next phase; until then, cached devices appear here." />
+                   Text="No recorder saved yet. Choose Add recorder to search your network." />
         <ListBox x:Name="ChannelList" Background="Transparent" BorderThickness="0"
                  Foreground="{StaticResource Text}" />
       </DockPanel>

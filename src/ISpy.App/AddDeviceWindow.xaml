@@ -1,0 +1,71 @@
+<Window x:Class="ISpy.App.AddDeviceWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Add a recorder" Height="520" Width="620"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        Background="{StaticResource Surface}" Foreground="{StaticResource Text}"
+        TextOptions.TextFormattingMode="Display">
+  <Grid Margin="18">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <DockPanel Grid.Row="0" Margin="0,0,0,10">
+      <Button x:Name="ScanButton" DockPanel.Dock="Right" Content="Scan again"
+              Padding="12,5" Click="OnScan" />
+      <TextBlock x:Name="ScanStatus" VerticalAlignment="Center"
+                 Foreground="{StaticResource TextMuted}" Text="Searching the network…" />
+    </DockPanel>
+
+    <ListBox x:Name="DeviceList" Grid.Row="1" Background="{StaticResource SurfaceRaised}"
+             BorderBrush="{StaticResource Border}" BorderThickness="1"
+             Foreground="{StaticResource Text}" SelectionChanged="OnDeviceSelected">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <StackPanel Margin="4">
+            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Detail}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+          </StackPanel>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <!-- Manual entry, for the case where the router blocks multicast and nothing is found. -->
+    <Grid Grid.Row="2" Margin="0,12,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Address" VerticalAlignment="Center" Margin="0,0,8,6" />
+      <TextBox x:Name="HostBox" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,0,8,6" Padding="4,3" />
+      <TextBlock Grid.Row="0" Grid.Column="4" Text="HTTP port" VerticalAlignment="Center" Margin="0,0,8,6" />
+      <TextBox x:Name="PortBox" Grid.Row="0" Grid.Column="5" Text="80" Margin="0,0,0,6" Padding="4,3" />
+
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="Username" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <TextBox x:Name="UserBox" Grid.Row="1" Grid.Column="1" Text="admin" Margin="0,0,8,0" Padding="4,3" />
+      <TextBlock Grid.Row="1" Grid.Column="2" Text="Password" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <PasswordBox x:Name="PasswordBox" Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="3" Padding="4,3" />
+    </Grid>
+
+    <DockPanel Grid.Row="3" Margin="0,14,0,0">
+      <Button x:Name="ConnectButton" DockPanel.Dock="Right" Content="Connect" Padding="18,6"
+              IsDefault="True" Click="OnConnect" />
+      <Button DockPanel.Dock="Right" Content="Cancel" Padding="18,6" Margin="0,0,8,0"
+              IsCancel="True" />
+      <TextBlock x:Name="ResultText" VerticalAlignment="Center" TextWrapping="Wrap"
+                 Foreground="{StaticResource TextMuted}" />
+    </DockPanel>
+  </Grid>
+</Window>
