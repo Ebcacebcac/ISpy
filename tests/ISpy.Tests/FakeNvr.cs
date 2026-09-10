@@ -20,13 +20,17 @@ internal sealed class FakeNvr : IDisposable
     public FakeNvr()
     {
         Port = FreePort();
-        _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
+
+        // "localhost" rather than an explicit 127.0.0.1 prefix: on Windows, HttpListener needs a
+        // netsh URL ACL reservation for a specific-IP prefix but allows localhost unelevated, and
+        // the release workflow runs these tests on a Windows runner.
+        _listener.Prefixes.Add($"http://localhost:{Port}/");
         _listener.Start();
         _ = Task.Run(ServeAsync);
     }
 
     public int Port { get; }
-    public string Host => "127.0.0.1";
+    public string Host => "localhost";
 
     /// <summary>Requests the fake has received, so tests can assert what was actually asked for.</summary>
     public List<string> Requests { get; } = [];
