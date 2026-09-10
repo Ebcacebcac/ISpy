@@ -49,36 +49,52 @@ public static class TileLayout
     /// </summary>
     public static IReadOnlyList<TileRect> Compute(GridLayout layout, int canvasWidth, int canvasHeight)
     {
-        var (columns, rows) = Dimensions(layout);
+        var (side, _) = Dimensions(layout);
+        return Compute(LayoutSpec.Uniform(layout.ToString(), side), canvasWidth, canvasHeight);
+    }
+
+    /// <summary>
+    /// Lays a spec's tiles onto the canvas. A spanning tile's edges land exactly on the cell
+    /// boundaries of the tiles around it, so a hero tile lines up with its neighbours to the pixel.
+    /// </summary>
+    public static IReadOnlyList<TileRect> Compute(LayoutSpec spec, int canvasWidth, int canvasHeight)
+    {
         if (canvasWidth <= 0 || canvasHeight <= 0) return [];
 
-        var usableWidth = Math.Max(0, canvasWidth - Gutter * (columns - 1));
-        var usableHeight = Math.Max(0, canvasHeight - Gutter * (rows - 1));
+        var columnStarts = CellBoundaries(spec.Columns, canvasWidth);
+        var rowStarts = CellBoundaries(spec.Rows, canvasHeight);
 
-        var baseWidth = usableWidth / columns;
-        var baseHeight = usableHeight / rows;
-        var extraColumns = usableWidth % columns;
-        var extraRows = usableHeight % rows;
+        return spec.Cells
+            .Select(cell => new TileRect(
+                columnStarts[cell.Column],
+                rowStarts[cell.Row],
+                columnStarts[cell.Right] - columnStarts[cell.Column] - Gutter,
+                rowStarts[cell.Bottom] - rowStarts[cell.Row] - Gutter))
+            .ToArray();
+    }
 
-        var tiles = new List<TileRect>(columns * rows);
-        var y = 0;
+    /// <summary>
+    /// Start position of each of <paramref name="count"/> cells across <paramref name="total"/>
+    /// pixels, plus a final sentinel one gutter past the end - which is what lets a span's width be
+    /// computed as a simple difference of boundaries.
+    /// </summary>
+    private static int[] CellBoundaries(int count, int total)
+    {
+        var usable = Math.Max(0, total - Gutter * (count - 1));
+        var baseSize = usable / count;
+        var extra = usable % count;
 
-        for (var row = 0; row < rows; row++)
+        var starts = new int[count + 1];
+        var position = 0;
+
+        for (var i = 0; i < count; i++)
         {
-            var height = baseHeight + (row < extraRows ? 1 : 0);
-            var x = 0;
-
-            for (var column = 0; column < columns; column++)
-            {
-                var width = baseWidth + (column < extraColumns ? 1 : 0);
-                tiles.Add(new TileRect(x, y, width, height));
-                x += width + Gutter;
-            }
-
-            y += height + Gutter;
+            starts[i] = position;
+            position += baseSize + (i < extra ? 1 : 0) + Gutter;
         }
 
-        return tiles;
+        starts[count] = position;
+        return starts;
     }
 
     /// <summary>

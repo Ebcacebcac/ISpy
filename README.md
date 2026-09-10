@@ -16,8 +16,11 @@ recorder is three metres away on the same switch.
   exports them for your reseller, walks you through the Guarding Vision account reset, and
   connects the moment you've set a new one. It never fakes the reset itself — that ownership
   check stays with your account or reseller, where the key actually lives.
-- **Live grid** of 1, 4, 9 or 16 cameras, hardware-decoded on the GPU. Tiles use the recorder's
-  sub-stream; double-click one and it switches to the full-resolution main stream.
+- **Live grid** with uniform layouts (1, 2x2, 3x3, 4x4), the classic hero layouts (1+5, 1+7 -
+  one large focus tile with small ones around it), and a designer for building your own
+  arrangements. Drag a camera between tiles to choose what sits in the big one; double-click a
+  tile for full screen. Everything is hardware-decoded on the GPU, with small tiles on the
+  recorder's sub-stream and large ones on the full-resolution main stream.
 - **Recorded playback** with a scrubbable day timeline, colour-coded by what triggered the
   recording, and clip export to MP4 with no re-encoding.
 - **Updates itself** from GitHub Releases, checked in the background and never on the startup path.

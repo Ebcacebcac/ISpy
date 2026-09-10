@@ -13,6 +13,9 @@ namespace ISpy.App;
 internal sealed record GridEntry(Device Device, Channel Channel, CameraStream Stream)
 {
     public StreamProfile Profile { get; set; } = StreamProfile.Sub;
+
+    /// <summary>Stable identity for persisting the user's tile arrangement.</summary>
+    public string OrderKey => $"{Device.Id}|{Channel.Number}";
 }
 
 /// <summary>
@@ -32,8 +35,9 @@ public sealed class LiveGrid : IDisposable
     private int _width;
     private int _height;
 
-    /// <summary>Settings key for the remembered grid shape.</summary>
-    private const string LayoutSetting = "grid.layout";
+    private const string LayoutSetting = "grid.layout.spec";
+    private const string LegacyLayoutSetting = "grid.layout";
+    private const string OrderSetting = "grid.order";
 
     public LiveGrid(InventoryStore store)
     {
@@ -41,10 +45,26 @@ public sealed class LiveGrid : IDisposable
 
         // Restoring the shape the user left the app in is part of it feeling instant: the grid is
         // already the right shape when the first frames land, with no visible reflow.
-        if (int.TryParse(store.GetSetting(LayoutSetting), out var cells) &&
-            Enum.IsDefined(typeof(GridLayout), cells))
+        var restored = LayoutSpec.FromJson(store.GetSetting(LayoutSetting));
+
+        // Older builds stored the uniform grid as an enum number; honour it once, then the spec
+        // setting takes over.
+        if (restored is null &&
+            int.TryParse(store.GetSetting(LegacyLayoutSetting), out var legacy))
         {
-            Layout = (GridLayout)cells;
+            restored = legacy switch
+            {
+                1 => LayoutSpec.Single,
+                4 => LayoutSpec.TwoByTwo,
+                9 => LayoutSpec.ThreeByThree,
+                16 => LayoutSpec.FourByFour,
+                _ => null,
+            };
+        }
+
+        if (restored is not null)
+        {
+            Layout = restored;
             _layoutRestored = true;
         }
     }
@@ -52,7 +72,10 @@ public sealed class LiveGrid : IDisposable
     /// <summary>Which tile is maximised, or null when the whole grid is shown.</summary>
     public int? MaximizedIndex { get; private set; }
 
-    public GridLayout Layout { get; private set; } = GridLayout.TwoByTwo;
+    /// <summary>Tile the user is currently dragging, drawn with a highlight border.</summary>
+    public int? HighlightedIndex { get; set; }
+
+    public LayoutSpec Layout { get; private set; } = LayoutSpec.TwoByTwo;
 
     public int CameraCount => _entries.Count;
 
@@ -129,8 +152,10 @@ public sealed class LiveGrid : IDisposable
             }
         }
 
+        RestoreOrder();
+
         // Only auto-size the grid when the user has not chosen a shape themselves.
-        if (!_layoutRestored) Layout = TileLayout.FitFor(_entries.Count);
+        if (!_layoutRestored) Layout = LayoutSpec.FitFor(_entries.Count);
 
         UpdateStreamProfiles();
     }
@@ -146,13 +171,53 @@ public sealed class LiveGrid : IDisposable
         };
     }
 
-    public void SetLayout(GridLayout layout)
+    public void SetLayout(LayoutSpec layout)
     {
         Layout = layout;
         MaximizedIndex = null;
 
-        _store.SetSetting(LayoutSetting, ((int)layout).ToString());
+        _store.SetSetting(LayoutSetting, layout.ToJson());
         UpdateStreamProfiles();
+    }
+
+    /// <summary>
+    /// Swaps two tiles' cameras - how a camera is moved into the hero tile. Persisted, so the
+    /// arrangement survives restarts.
+    /// </summary>
+    public void SwapTiles(int first, int second)
+    {
+        if (first == second) return;
+        if (first < 0 || second < 0 || first >= _entries.Count || second >= _entries.Count) return;
+
+        (_entries[first], _entries[second]) = (_entries[second], _entries[first]);
+
+        _store.SetSetting(OrderSetting,
+            System.Text.Json.JsonSerializer.Serialize(_entries.Select(e => e.OrderKey).ToArray()));
+
+        // The two cameras now sit in different-sized tiles, so their stream profiles may flip.
+        UpdateStreamProfiles();
+    }
+
+    private void RestoreOrder()
+    {
+        string[]? saved = null;
+
+        try
+        {
+            var json = _store.GetSetting(OrderSetting);
+            if (json is not null)
+                saved = System.Text.Json.JsonSerializer.Deserialize<string[]>(json);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // A corrupt setting means natural order, nothing worse.
+        }
+
+        if (saved is null) return;
+
+        var ordered = TileOrder.Apply(_entries, entry => entry.OrderKey, saved);
+        _entries.Clear();
+        _entries.AddRange(ordered);
     }
 
     /// <summary>Maximises a tile, or restores the grid when it is already maximised.</summary>
@@ -175,7 +240,9 @@ public sealed class LiveGrid : IDisposable
 
     /// <summary>
     /// Moves each stream onto the profile its current tile size warrants. This is what makes a
-    /// maximised camera sharpen: the tile is now large enough to justify the main stream.
+    /// maximised camera sharpen: the tile is now large enough to justify the main stream. It is
+    /// also what puts the hero tile of a 1+7 layout on the main stream while the small tiles
+    /// around it stay on the cheap sub-stream.
     /// </summary>
     private void UpdateStreamProfiles()
     {
@@ -189,7 +256,10 @@ public sealed class LiveGrid : IDisposable
 
             if (!visible) continue;
 
-            var tileWidth = i < tiles.Count ? tiles[i].Width : 0;
+            var tileWidth = isMaximized
+                ? _width
+                : i < tiles.Count ? tiles[i].Width : 0;
+
             var wanted = StreamSelection.Resolve(
                 entry.Channel, StreamSelection.ForTile(tileWidth, isMaximized));
 
@@ -251,7 +321,7 @@ public sealed class LiveGrid : IDisposable
         {
             for (var i = 0; i < tiles.Count && i < _entries.Count; i++)
             {
-                visuals.Add(ToVisual(_entries[i], tiles[i], isSelected: false));
+                visuals.Add(ToVisual(_entries[i], tiles[i], isSelected: HighlightedIndex == i));
             }
         }
 

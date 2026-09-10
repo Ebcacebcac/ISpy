@@ -34,14 +34,8 @@
                    MouseLeftButtonUp="OnUpdateClicked" />
         <Button x:Name="AddButton" DockPanel.Dock="Right" Content="Add recorder" Padding="12,4"
                 Margin="8,0,0,0" Click="OnAddDevice" />
-        <Button DockPanel.Dock="Right" Content="16" Padding="10,4" Margin="2,0,8,0"
-                Tag="16" Click="OnSetLayout" />
-        <Button DockPanel.Dock="Right" Content="9" Padding="10,4" Margin="2,0,0,0"
-                Tag="9" Click="OnSetLayout" />
-        <Button DockPanel.Dock="Right" Content="4" Padding="10,4" Margin="2,0,0,0"
-                Tag="4" Click="OnSetLayout" />
-        <Button DockPanel.Dock="Right" Content="1" Padding="10,4" Margin="8,0,0,0"
-                Tag="1" Click="OnSetLayout" />
+        <ComboBox x:Name="LayoutPicker" DockPanel.Dock="Right" MinWidth="110" Margin="8,0,8,0"
+                  VerticalAlignment="Center" SelectionChanged="OnLayoutPicked" />
         <Button x:Name="RefreshButton" DockPanel.Dock="Right" Content="Refresh" Padding="12,4"
                 Click="OnRefresh" />
         <Button x:Name="PlaybackButton" DockPanel.Dock="Right" Content="Playback" Padding="12,4"
@@ -68,8 +62,7 @@
     <!-- Video canvas. The child HWND the swapchain presents into; nothing may be layered over it,
          so tile labels are drawn inside the swapchain with Direct2D. -->
     <Grid Grid.Row="1" Grid.Column="1" Background="#0B0D12">
-      <local:VideoCanvas x:Name="VideoHost"
-                         MouseLeftButtonDown="OnCanvasClick" />
+      <local:VideoCanvas x:Name="VideoHost" />
       <TextBlock x:Name="CanvasHint" HorizontalAlignment="Center" VerticalAlignment="Center"
                  Foreground="{StaticResource TextMuted}" IsHitTestVisible="False"
                  Text="Add a recorder to see your cameras." />

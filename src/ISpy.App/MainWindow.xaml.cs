@@ -115,6 +115,7 @@ public partial class MainWindow : Window
 
         _grid = grid;
         StartStreams();
+        PopulateLayoutPicker();
     }
 
     private void StartStreams()
@@ -145,24 +146,122 @@ public partial class MainWindow : Window
         StatusText.Text = _grid.StatusSummary();
     }
 
-    private void OnSetLayout(object sender, RoutedEventArgs e)
-    {
-        if (_grid is null || sender is not FrameworkElement { Tag: string tag }) return;
-        if (!int.TryParse(tag, out var cells)) return;
+    // ---- layout picker ---------------------------------------------------
 
-        _grid.SetLayout((GridLayout)cells);
+    /// <summary>Sentinel item at the bottom of the picker that opens the designer.</summary>
+    private sealed record NewLayoutItem
+    {
+        public override string ToString() => "New custom layout…";
+    }
+
+    private sealed record LayoutItem(LayoutSpec Spec)
+    {
+        public override string ToString() => Spec.Name;
+    }
+
+    private const string CustomLayoutsSetting = "layouts.custom";
+    private bool _updatingPicker;
+
+    private void PopulateLayoutPicker()
+    {
+        if (_store is null || _grid is null) return;
+
+        _updatingPicker = true;
+        LayoutPicker.Items.Clear();
+
+        foreach (var spec in LayoutSpec.BuiltIn)
+            LayoutPicker.Items.Add(new LayoutItem(spec));
+
+        foreach (var spec in LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting)))
+            LayoutPicker.Items.Add(new LayoutItem(spec));
+
+        LayoutPicker.Items.Add(new NewLayoutItem());
+
+        LayoutPicker.SelectedItem = LayoutPicker.Items.OfType<LayoutItem>()
+            .FirstOrDefault(item => item.Spec.Name == _grid.Layout.Name);
+
+        _updatingPicker = false;
+    }
+
+    private void OnLayoutPicked(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (_updatingPicker || _grid is null || _store is null) return;
+
+        switch (LayoutPicker.SelectedItem)
+        {
+            case LayoutItem item:
+                _grid.SetLayout(item.Spec);
+                break;
+
+            case NewLayoutItem:
+                var editor = new LayoutEditorWindow { Owner = this };
+
+                if (editor.ShowDialog() == true && editor.Result is { } created)
+                {
+                    // Saved custom layouts live in settings; same-named ones are replaced.
+                    var customs = LayoutSpec.ListFromJson(_store.GetSetting(CustomLayoutsSetting));
+                    customs.RemoveAll(spec => spec.Name == created.Name);
+                    customs.Add(created);
+                    _store.SetSetting(CustomLayoutsSetting, LayoutSpec.ListToJson(customs));
+
+                    _grid.SetLayout(created);
+                }
+
+                PopulateLayoutPicker();
+                break;
+        }
+    }
+
+    // ---- mouse on the video canvas ---------------------------------------
+    // Raised by the canvas's own window in device pixels, which is the layout's coordinate space.
+
+    private int? _dragSource;
+    private (int X, int Y) _dragStart;
+    private bool _dragging;
+
+    private void OnCanvasPressed(int x, int y)
+    {
+        if (_grid is null) return;
+
+        _dragSource = _grid.HitTest(x, y);
+        _dragStart = (x, y);
+        _dragging = false;
+    }
+
+    private void OnCanvasMoved(int x, int y)
+    {
+        if (_grid is null || _dragSource is null) return;
+
+        // A real drag, not a wobbly click: highlight the source tile so the user can see what
+        // they are about to move.
+        if (!_dragging && (Math.Abs(x - _dragStart.X) > 8 || Math.Abs(y - _dragStart.Y) > 8))
+        {
+            _dragging = true;
+            _grid.HighlightedIndex = _dragSource;
+        }
+    }
+
+    private void OnCanvasReleased(int x, int y)
+    {
+        if (_grid is null) return;
+
+        var source = _dragSource;
+        _dragSource = null;
+        _grid.HighlightedIndex = null;
+
+        if (!_dragging || source is null) return;
+        _dragging = false;
+
+        if (_grid.HitTest(x, y) is { } target && target != source.Value)
+            _grid.SwapTiles(source.Value, target);
     }
 
     /// <summary>Double-click maximises a tile, which also switches it to the main stream.</summary>
-    private void OnCanvasClick(object sender, MouseButtonEventArgs e)
+    private void OnCanvasDoubleClicked(int x, int y)
     {
-        if (_grid is null || e.ClickCount < 2) return;
+        if (_grid is null) return;
 
-        var scale = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
-        var point = e.GetPosition(VideoHost);
-
-        if (_grid.HitTest((int)(point.X * scale), (int)(point.Y * scale)) is { } index)
-            _grid.ToggleMaximized(index);
+        if (_grid.HitTest(x, y) is { } index) _grid.ToggleMaximized(index);
     }
 
     /// <summary>
