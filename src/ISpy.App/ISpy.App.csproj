@@ -13,5 +13,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ISpy.Core/ISpy.Core.csproj" />
+    <ProjectReference Include="..\ISpy.Media\ISpy.Media.csproj" />
   </ItemGroup>
 </Project>

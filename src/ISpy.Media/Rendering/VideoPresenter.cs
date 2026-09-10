@@ -8,6 +8,15 @@ using ID3D11Device = Vortice.Direct3D11.ID3D11Device;
 
 namespace ISpy.Media.Rendering;
 
+/// <summary>What to draw in one tile this frame.</summary>
+public readonly record struct TileVisual(
+    VideoSurface Surface,
+    TileRect Tile,
+    string Label,
+    StreamState State,
+    string? Message,
+    bool IsSelected);
+
 /// <summary>Constant buffer laid out to match TileConstants in the vertex shader.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal struct TileConstants
@@ -34,6 +43,7 @@ public sealed class VideoPresenter : IDisposable
     private ID3D11PixelShader? _pixelShader;
     private ID3D11Buffer? _constants;
     private ID3D11SamplerState? _sampler;
+    private OverlayRenderer? _overlay;
 
     private int _width;
     private int _height;
@@ -46,6 +56,9 @@ public sealed class VideoPresenter : IDisposable
 
         CreateSwapChain(windowHandle);
         CreatePipeline();
+
+        _overlay = new OverlayRenderer(gpu);
+        _overlay.BindTarget(_swapChain!);
     }
 
     private void CreateSwapChain(IntPtr windowHandle)
@@ -81,6 +94,9 @@ public sealed class VideoPresenter : IDisposable
         using var backBuffer = _swapChain!.GetBuffer<Vortice.Direct3D11.ID3D11Texture2D>(0);
         _backBufferView = _gpu.Device.CreateRenderTargetView(backBuffer);
     }
+
+    /// <summary>Size of the canvas in device pixels.</summary>
+    public (int Width, int Height) Size => (_width, _height);
 
     private void CreatePipeline()
     {
@@ -122,6 +138,9 @@ public sealed class VideoPresenter : IDisposable
         _width = width;
         _height = height;
 
+        // Every view onto the back buffer must be released before ResizeBuffers will succeed,
+        // the Direct2D overlay target included.
+        _overlay?.BindTargetRelease();
         _backBufferView?.Dispose();
         _backBufferView = null;
 
@@ -129,10 +148,11 @@ public sealed class VideoPresenter : IDisposable
         _swapChain.ResizeBuffers(2, (uint)width, (uint)height, Format.B8G8R8A8_UNorm, SwapChainFlags.None);
 
         CreateBackBufferView();
+        _overlay?.BindTarget(_swapChain);
     }
 
-    /// <summary>Draws the given surfaces into their tiles and presents the result.</summary>
-    public void Present(IReadOnlyList<(VideoSurface Surface, TileRect Tile)> tiles, bool waitForVSync = true)
+    /// <summary>Draws every tile - picture then label - and presents the result.</summary>
+    public void Present(IReadOnlyList<TileVisual> tiles, bool waitForVSync = true)
     {
         if (_swapChain is null || _backBufferView is null) return;
 
@@ -148,12 +168,13 @@ public sealed class VideoPresenter : IDisposable
         context.PSSetSampler(0, _sampler);
         context.VSSetConstantBuffer(0, _constants);
 
-        foreach (var (surface, tile) in tiles)
+        foreach (var visual in tiles)
         {
+            var surface = visual.Surface;
             if (!surface.HasContent || surface.Luma is null || surface.Chroma is null) continue;
 
             // Preserve the camera's aspect ratio inside its tile rather than stretching it.
-            var target = TileLayout.Letterbox(tile, surface.Width, surface.Height);
+            var target = TileLayout.Letterbox(visual.Tile, surface.Width, surface.Height);
             if (target.Width <= 0 || target.Height <= 0) continue;
 
             WriteConstants(target);
@@ -161,6 +182,19 @@ public sealed class VideoPresenter : IDisposable
             context.PSSetShaderResource(0, surface.Luma);
             context.PSSetShaderResource(1, surface.Chroma);
             context.Draw(4, 0);
+        }
+
+        if (_overlay is not null)
+        {
+            _overlay.Begin();
+
+            foreach (var visual in tiles)
+            {
+                _overlay.DrawTile(
+                    visual.Tile, visual.Label, visual.State, visual.Message, visual.IsSelected);
+            }
+
+            _overlay.End();
         }
 
         // Present with vsync so we never render faster than the display; a camera grid gains
@@ -194,6 +228,7 @@ public sealed class VideoPresenter : IDisposable
 
     public void Dispose()
     {
+        _overlay?.Dispose();
         _sampler?.Dispose();
         _constants?.Dispose();
         _pixelShader?.Dispose();

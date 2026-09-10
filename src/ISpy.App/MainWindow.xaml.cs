@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
 using ISpy.Core;
+using ISpy.Core.Media;
 using ISpy.Core.Isapi;
 using ISpy.Core.Model;
 using ISpy.Core.Security;
@@ -12,10 +14,19 @@ namespace ISpy.App;
 public partial class MainWindow : Window
 {
     private InventoryStore? _store;
+    private LiveGrid? _grid;
+    private IntPtr _canvasHandle;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        VideoHost.SurfaceReady += handle =>
+        {
+            _canvasHandle = handle;
+            TryStartVideo();
+        };
+        VideoHost.SurfaceResized += (width, height) => _grid?.Resize(width, height);
 
         // Loading happens strictly after the first frame is on screen. Background priority
         // guarantees WPF has finished rendering before we do any I/O.
@@ -31,6 +42,7 @@ public partial class MainWindow : Window
             AppPaths.EnsureCreated();
             _store = InventoryStore.Open(AppPaths.InventoryDatabase, SecretProtector.CreateDefault());
             RenderInventory();
+            TryStartVideo();
         }
         catch (Exception ex)
         {
@@ -71,13 +83,84 @@ public partial class MainWindow : Window
         };
     }
 
+    /// <summary>
+    /// Creates the Direct3D device and starts streaming, once both prerequisites exist: the canvas
+    /// window (built when WPF realises the visual tree) and the inventory (loaded after first
+    /// paint). Either can happen first, so whichever arrives last does the work.
+    /// </summary>
+    private void TryStartVideo()
+    {
+        if (_grid is not null || _store is null || _canvasHandle == IntPtr.Zero) return;
+
+        var (width, height) = VideoHost.PixelSize;
+
+        var grid = new LiveGrid(_store);
+        grid.StateChanged += () => Dispatcher.BeginInvoke(ShowStreamStatus);
+
+        try
+        {
+            grid.Attach(_canvasHandle, width, height);
+        }
+        catch (Exception ex)
+        {
+            // No Direct3D means no video, but the rest of the app must stay usable.
+            CanvasHint.Text = $"Video could not start: {ex.Message}";
+            grid.Dispose();
+            return;
+        }
+
+        _grid = grid;
+        StartStreams();
+    }
+
+    private void StartStreams()
+    {
+        if (_grid is null || _store is null) return;
+
+        _grid.Start();
+        StartupTimeline.Mark("streams started");
+
+        CanvasHint.Visibility = _grid.CameraCount == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ShowStreamStatus();
+    }
+
+    private void ShowStreamStatus()
+    {
+        if (_grid is null || _grid.CameraCount == 0) return;
+
+        StatusText.Text = _grid.StatusSummary();
+    }
+
+    private void OnSetLayout(object sender, RoutedEventArgs e)
+    {
+        if (_grid is null || sender is not FrameworkElement { Tag: string tag }) return;
+        if (!int.TryParse(tag, out var cells)) return;
+
+        _grid.SetLayout((GridLayout)cells);
+    }
+
+    /// <summary>Double-click maximises a tile, which also switches it to the main stream.</summary>
+    private void OnCanvasClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_grid is null || e.ClickCount < 2) return;
+
+        var scale = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+        var point = e.GetPosition(VideoHost);
+
+        if (_grid.HitTest((int)(point.X * scale), (int)(point.Y * scale)) is { } index)
+            _grid.ToggleMaximized(index);
+    }
+
     private void OnAddDevice(object sender, RoutedEventArgs e)
     {
         if (_store is null) return;
 
         var dialog = new AddDeviceWindow(_store) { Owner = this };
 
-        if (dialog.ShowDialog() == true) RenderInventory();
+        if (dialog.ShowDialog() != true) return;
+
+        RenderInventory();
+        StartStreams();
     }
 
     /// <summary>
@@ -103,6 +186,7 @@ public partial class MainWindow : Window
             }
 
             RenderInventory();
+            StartStreams();
 
             if (failures.Count > 0) StatusText.Text = string.Join("   ", failures);
         }
@@ -121,6 +205,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _grid?.Dispose();
         _store?.Dispose();
         base.OnClosed(e);
     }
