@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ISpy.App</RootNamespace>
+    <AssemblyName>ISpy</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Startup budget: no satellite assembly probing, no unnecessary JIT on the paint path. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <TieredPGO>true</TieredPGO>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ISpy.Core/ISpy.Core.csproj" />
+  </ItemGroup>
+</Project>

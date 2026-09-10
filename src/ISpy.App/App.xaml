@@ -1,0 +1,14 @@
+<Application x:Class="ISpy.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Intentionally no merged resource dictionaries: every one of them is parsed before the
+       first window can paint, and startup time is the whole point of this app. -->
+  <Application.Resources>
+    <SolidColorBrush x:Key="Surface" Color="#12141A" />
+    <SolidColorBrush x:Key="SurfaceRaised" Color="#1B1E26" />
+    <SolidColorBrush x:Key="Border" Color="#2A2F3A" />
+    <SolidColorBrush x:Key="Text" Color="#E6E8ED" />
+    <SolidColorBrush x:Key="TextMuted" Color="#8B93A3" />
+    <SolidColorBrush x:Key="Accent" Color="#4C8DFF" />
+  </Application.Resources>
+</Application>

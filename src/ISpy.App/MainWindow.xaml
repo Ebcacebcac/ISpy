@@ -1,0 +1,59 @@
+<Window x:Class="ISpy.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="ISpy" Height="720" Width="1180"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Surface}"
+        Foreground="{StaticResource Text}"
+        TextOptions.TextFormattingMode="Display">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="260" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- Title bar -->
+    <Border Grid.Row="0" Grid.ColumnSpan="2" Background="{StaticResource SurfaceRaised}"
+            BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="16,10">
+      <DockPanel>
+        <TextBlock Text="ISpy" FontSize="15" FontWeight="SemiBold" />
+        <TextBlock x:Name="UpdateIndicator" DockPanel.Dock="Right" Visibility="Collapsed"
+                   Foreground="{StaticResource Accent}" Cursor="Hand" Text="Update available" />
+        <TextBlock x:Name="StatusText" Margin="16,0,0,0" VerticalAlignment="Center"
+                   Foreground="{StaticResource TextMuted}" Text="Starting…" />
+      </DockPanel>
+    </Border>
+
+    <!-- Device / camera list -->
+    <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource SurfaceRaised}"
+            BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Margin="16,14,16,8" Foreground="{StaticResource TextMuted}"
+                   FontSize="11" FontWeight="SemiBold" Text="CAMERAS" />
+        <TextBlock x:Name="EmptyHint" DockPanel.Dock="Top" Margin="16,4,16,0" TextWrapping="Wrap"
+                   Foreground="{StaticResource TextMuted}" Visibility="Collapsed"
+                   Text="No recorder saved yet. Discovery arrives in the next phase; until then, cached devices appear here." />
+        <ListBox x:Name="ChannelList" Background="Transparent" BorderThickness="0"
+                 Foreground="{StaticResource Text}" />
+      </DockPanel>
+    </Border>
+
+    <!-- Video canvas: Phase 4 replaces this placeholder with the D3D11 swapchain host. -->
+    <Border x:Name="VideoHost" Grid.Row="1" Grid.Column="1" Background="#0B0D12">
+      <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                 Foreground="{StaticResource TextMuted}"
+                 Text="Live grid renders here." />
+    </Border>
+
+    <!-- Status bar -->
+    <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource SurfaceRaised}"
+            BorderBrush="{StaticResource Border}" BorderThickness="0,1,0,0" Padding="16,6">
+      <TextBlock x:Name="StartupText" Foreground="{StaticResource TextMuted}" FontSize="11" />
+    </Border>
+  </Grid>
+</Window>
